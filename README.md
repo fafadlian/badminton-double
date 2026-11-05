@@ -13,11 +13,23 @@ It is a single HTML file with no backend, account or install. Open it in a phone
 
 <sub>Screenshots use made-up names and scores.</sub>
 
+## Four tabs
+
+| Tab | What's on it |
+|---|---|
+| **Play** | The court, the score, the game timer and who's up next. Nothing else, so you never scroll while scoring. |
+| **Results** | Standings, characters and highlights, with per-player stats, partners and every game folded away underneath. |
+| **Setup** | Players, game mode, the session planner, backup and reset. A new session starts here and ends with **Start playing**. |
+| **About** | What the app is, how to use it, and what the numbers and characters mean. |
+
+The rules line under the title is a shortcut to Setup.
+
 ## What it does
 
 - **Partner rotation.** Plans the games so every pair partners at least once, games are shared out evenly, and nobody sits out more than they have to.
 - **Late arrivals and early leavers.** Mark someone as here or not here and the remaining games are re-planned. The game on court stays as it is unless someone in it leaves.
-- **Scoring from one phone.** Tap a player's name to give their side the point and credit that player. Use **+** for points nobody really earned. Scores follow the game mode you pick, so a game can't be finished on an impossible score.
+- **Scoring from one phone.** Tap a player's name to give their side the point and credit that player, or tap a side's score when nobody in particular earned it. **Undo last point** takes back the last tap. Scores follow the game mode you pick, so a game can't be finished on an impossible score.
+- **Safety nets.** After **Finish**, an **Undo** button appears for a few seconds. **Reset to 0–0** needs two taps. The game mode is locked while a game is in progress.
 - **Game modes.** Points to win, deuce with or without a cap, and an optional time limit per game where a level score is either a draw or goes to a deciding point.
 - **Session planner.** Estimates how long a game takes and how many fit in your booking. When they don't fit, it suggests a lower score, a time limit, or fewer games.
 - **Standings.** Ranked by win rate, then by **Won %**, the share of all points played that your side won.
@@ -25,13 +37,14 @@ It is a single HTML file with no backend, account or install. Open it in a phone
 - **Characters.** One title per player, earned from the night's results.
 - **Partners grid.** Shows which pairs have played together, which are coming up, and which won't fit in the games planned.
 - **Results list** with undo for the last game.
+- **Copy for group chat.** Copies the standings and characters as text, ready to paste.
 - **Session clock** for your booking, with a warm-up countdown and the time left per remaining game.
 - **Copy and paste a session** to back it up or move it to another phone.
 - Works offline once it has been opened online, and follows the phone's light or dark mode.
 
 ## Game modes
 
-Set these under **Game mode**, or tap a preset:
+Set these on **Setup → Game mode**, or tap a preset:
 
 | Preset | Points to win | Deuce | Time limit |
 |---|---|---|---|
@@ -50,7 +63,7 @@ Draws count as half a win in the standings. Changes apply from the game on court
 
 ## Planning the session
 
-The **Session** section works out whether your games fit the booking:
+The **Session** section on Setup works out whether your games fit the booking:
 
 - **Session length** is the whole booking, and **warm-up** is the time before the first scored game.
 - **Each game** is estimated from the points to win, about 22 seconds a point, and a minute to swap players. After a few games it uses your group's actual pace instead.
@@ -94,18 +107,18 @@ Each title comes from a rule about the night's results, not from AI, so it works
 | The Metronome | The steadiest margins |
 | The Rollercoaster | The wildest swings between big wins and big losses |
 | Iron Lungs | The most total points played |
-| The Social Butterfly / The Grafter | Fallbacks when nothing else fits |
+| The Social Butterfly / The Grafter / The Regular | Fallbacks when nothing else fits |
 
 ## Using it at the court
 
 1. Open the site on the phone you'll score with. Use **Add to Home Screen** to get an app icon.
-2. Under **Players**, tap **Edit players** to rename people, or add players up to 8.
-3. Mark anyone who hasn't arrived as **Not here**.
-4. Pick a **Game mode** and check the **Session** planner fits your booking.
-5. Start the session clock, then score each game and tap **Finish**.
-6. If the line-up on court is different from the plan, tap **Change line-up** and swap names. The games after it re-plan around the change.
+2. On **Setup**, tap **Edit players** to rename people, or add players up to 8. Mark anyone who hasn't arrived as **Not here**.
+3. Pick a **Game mode** and check the **Session** planner fits your booking, then tap **Start playing**.
+4. On **Play**, start the session clock, score each game and tap **Finish**.
+5. If the line-up on court is different from the plan, tap **Change line-up** and swap names. The games after it re-plan around the change.
+6. At the end, open **Results** and tap **Copy for group chat**.
 
-**Reset session** clears the scores but keeps the players and game mode.
+**Reset session** (on Setup) clears the scores but keeps the players and game mode.
 
 ## Your data
 
@@ -113,7 +126,7 @@ Scores are saved in the phone's browser storage (`localStorage`). Nothing is sen
 
 - Each phone and browser has its own copy.
 - Clearing browser data, or using a private window, loses it.
-- To keep a night's results, use **Session → Copy session** and paste the text somewhere safe. **Paste a session** loads it back.
+- To keep a night's results, use **Setup → Copy session** and paste the text somewhere safe. **Paste a session** loads it back.
 
 ## Hosting on GitHub Pages
 

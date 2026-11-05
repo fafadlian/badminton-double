@@ -45,17 +45,21 @@
 }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.45;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
-.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+main,.tabpanel{display:flex;flex-direction:column;gap:28px}
+.tabpanel[hidden]{display:none!important}
 button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:8px}
 h1,h2{font-family:var(--font-display);margin:0;text-wrap:balance}
-h1{font-size:2.4rem;font-weight:700;line-height:1;letter-spacing:.01em;text-transform:uppercase}
+h1{font-size:1.9rem;font-weight:700;line-height:1;letter-spacing:.01em;text-transform:uppercase}
 h2{font-size:1.05rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
 section{display:flex;flex-direction:column;gap:12px}
 .num{font-variant-numeric:tabular-nums}
 
-header{display:flex;flex-direction:column;gap:10px}
+header{display:flex;flex-direction:column;gap:6px}
+.toprow{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+.h2row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .eyebrow{font-family:var(--font-display);font-weight:600;text-transform:uppercase;letter-spacing:.1em;font-size:.9rem;color:var(--accent)}
 .hrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;color:var(--muted)}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:.9rem;color:var(--ink)}
@@ -91,9 +95,15 @@ button.chip{min-height:36px;padding:4px 14px}
 .net{background:repeating-linear-gradient(0deg,var(--court-line) 0 3px,transparent 3px 7px)}
 
 .scores{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.score{display:flex;align-items:center;justify-content:space-between;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px}
-.score output{font-family:var(--font-display);font-weight:700;font-size:3.4rem;line-height:1;font-variant-numeric:tabular-nums;min-width:2ch;text-align:center}
-.score output.lead{color:var(--lead)}
+.score{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:112px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 6px;width:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;transition:transform .08s,background .08s}
+.score:active{transform:scale(.98);background:var(--accent-soft)}
+.score .val{font-family:var(--font-display);font-weight:700;font-size:4rem;line-height:1;font-variant-numeric:tabular-nums}
+.score .val.lead{color:var(--lead)}
+.score .who{font-size:.85rem;color:var(--muted);text-align:center;overflow-wrap:anywhere}
+.score .hint{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+@media (prefers-reduced-motion: reduce){.score{transition:none}.score:active{transform:none}}
+.scoreacts{display:flex;gap:8px;flex-wrap:wrap}
+.scoreacts .btn{flex:1 1 9rem}
 .step{width:48px;height:48px;border-radius:10px;font-size:1.6rem;line-height:1;font-weight:500;display:grid;place-items:center}
 .step.minus{color:var(--muted)}
 .step.plus{background:var(--accent-soft);color:var(--accent)}
@@ -177,6 +187,39 @@ table{border-collapse:collapse;width:100%}
 .rerr{margin:0;color:var(--warn);font-weight:500}
 .ractions{display:flex;gap:8px;flex-wrap:wrap}
 .pin.ta{padding:10px 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;resize:vertical;width:100%}
+/* tabs */
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:25;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+.tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:60px;color:var(--muted);text-decoration:none;font-size:.78rem;font-weight:600;letter-spacing:.02em;-webkit-tap-highlight-color:transparent}
+.tabbar svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabbar a[aria-current="page"]{color:var(--accent)}
+.tabbar a[aria-current="page"] svg{stroke-width:2.2}
+.tabbar a:focus-visible{outline:3px solid var(--accent);outline-offset:-3px;border-radius:10px}
+@media (min-width:600px){.tabbar{grid-template-columns:repeat(4,120px);justify-content:center}}
+/* folded sections */
+.fold{border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.fold+.fold{border-top:0;margin-top:-28px}
+.fold summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;min-height:52px;font-family:var(--font-display);font-size:1.05rem;font-weight:600;text-transform:uppercase;letter-spacing:.09em;color:var(--muted)}
+.fold summary::-webkit-details-marker{display:none}
+.fold summary::after{content:"";width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg) translate(-2px,-2px);transition:transform .15s}
+.fold[open] summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
+@media (prefers-reduced-motion: reduce){.fold summary::after{transition:none}}
+.fold summary:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
+.foldbody{display:flex;flex-direction:column;gap:12px;padding-bottom:16px}
+/* setup flow, about */
+.startcard{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:14px;background:var(--accent-soft)}
+.startcard p{margin:0}
+.lockednote{margin:0;padding:10px 12px;border-radius:10px;background:var(--warn-soft);color:var(--ink)}
+.about{display:flex;flex-direction:column;gap:24px;max-width:62ch}
+.about h2{margin-bottom:-4px}
+.about p{margin:0}
+.about a{color:var(--accent);font-weight:600;text-underline-offset:3px}
+.about ol,.about ul{margin:0;padding-left:1.2rem;display:flex;flex-direction:column;gap:6px}
+.about dl{margin:0;display:grid;grid-template-columns:minmax(0,9rem) minmax(0,1fr);gap:8px 12px}
+.about dt{font-weight:600}
+.about dd{margin:0;color:var(--muted)}
+@media (max-width:420px){.about dl{grid-template-columns:1fr;gap:2px}.about dd{margin-bottom:8px}}
+.lead-in{font-size:1.1rem}
 /* game mode, session planner */
 a.eyebrow{text-decoration:none}
 a.eyebrow:hover{text-decoration:underline;text-underline-offset:3px}
@@ -191,7 +234,8 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
 .rulesum{margin:0;font-weight:500}
 .stepper output .unit{font-family:var(--font-body);font-size:.8rem;font-weight:500;color:var(--muted);margin-left:3px}
-.step:disabled{opacity:.35;cursor:default}
+.step:disabled,.btn:disabled,.chip:disabled,.seg button:disabled{opacity:.4;cursor:default}
+.seg button[aria-pressed="true"]:disabled{opacity:.6}
 .planbox{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
 .planrow{display:grid;grid-template-columns:5.2rem minmax(0,1fr);gap:8px;align-items:baseline}
 .planrow .tl{font-size:.75rem}
@@ -230,7 +274,8 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
 .pickrow{display:flex;flex-wrap:wrap;gap:6px}
 .split{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
 .split>div{min-width:0}
-#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:500;z-index:20;transition:opacity .2s}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);background:var(--ink);color:var(--bg);padding:10px 12px 10px 16px;border-radius:12px;font-weight:500;z-index:30;transition:opacity .2s;display:flex;align-items:center;gap:12px}
+.toastbtn{flex-shrink:0;min-height:36px;padding:0 12px;border-radius:8px;background:var(--bg);color:var(--ink);font-weight:700}
 @media (prefers-reduced-motion: reduce){#toast{transition:none}}
 </style>
 
@@ -238,63 +283,69 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
 <body>
 <div class="wrap">
   <header>
-    <a class="eyebrow" id="ruleline" href="#h-mode">1 court · first to 15</a>
-    <h1>Thursday Doubles</h1>
-    <div class="hrow"><span id="meta" class="num"></span><span id="clock"></span></div>
+    <div class="toprow"><h1>Thursday Doubles</h1><span id="clock"></span></div>
+    <a class="eyebrow" id="ruleline" href="#setup">1 court · first to 15</a>
+    <span id="meta" class="muted num"></span>
   </header>
 
-  <div id="arrivals"></div>
+  <main>
+  <div class="tabpanel" id="panel-play" role="region" aria-label="Play">
+    <div id="arrivals"></div>
+    <section aria-labelledby="h-court">
+      <h2 id="h-court">On court</h2>
+      <div id="oncourt"></div>
+    </section>
+    <section aria-labelledby="h-next" id="nextsec">
+      <h2 id="h-next">Up next</h2>
+      <div id="next"></div>
+    </section>
+  </div>
 
-  <section aria-labelledby="h-court">
-    <h2 id="h-court">On court</h2>
-    <div id="oncourt"></div>
-  </section>
+  <div class="tabpanel" id="panel-results" role="region" aria-label="Results" hidden>
+    <section aria-labelledby="h-stand">
+      <div class="h2row"><h2 id="h-stand">Standings</h2><button class="btn ghost small" id="sharebtn" data-act="share">Copy for group chat</button></div>
+      <div id="share"></div>
+      <div id="standings"></div>
+    </section>
+    <section aria-labelledby="h-chars">
+      <h2 id="h-chars">Characters</h2>
+      <div id="chars"></div>
+    </section>
+    <section aria-labelledby="h-stats">
+      <h2 id="h-stats">Highlights</h2>
+      <div id="stats"></div>
+    </section>
+    <details class="fold" id="fold-stats"><summary>Per-player stats</summary><div id="statsdetail" class="foldbody"></div></details>
+    <details class="fold" id="fold-pairs"><summary>Partners</summary><div id="pairs" class="foldbody"></div></details>
+    <details class="fold" id="fold-games"><summary>All games</summary><div id="gamelist" class="foldbody"></div></details>
+  </div>
 
-  <section aria-labelledby="h-next" id="nextsec">
-    <h2 id="h-next">Up next</h2>
-    <div id="next"></div>
-  </section>
+  <div class="tabpanel" id="panel-setup" role="region" aria-label="Setup" hidden>
+    <section aria-labelledby="h-roster">
+      <h2 id="h-roster">Players</h2>
+      <div id="roster" class="rosterwrap"></div>
+    </section>
+    <section aria-labelledby="h-mode">
+      <h2 id="h-mode">Game mode</h2>
+      <div id="mode" class="rosterwrap"></div>
+    </section>
+    <section aria-labelledby="h-session">
+      <h2 id="h-session">Session</h2>
+      <div id="session" class="rosterwrap"></div>
+    </section>
+  </div>
 
-  <section aria-labelledby="h-stand">
-    <h2 id="h-stand">Standings</h2>
-    <div id="standings"></div>
-  </section>
-
-  <section aria-labelledby="h-chars">
-    <h2 id="h-chars">Characters</h2>
-    <div id="chars"></div>
-  </section>
-
-  <section aria-labelledby="h-stats">
-    <h2 id="h-stats">Stats</h2>
-    <div id="stats"></div>
-  </section>
-
-  <section aria-labelledby="h-pairs">
-    <h2 id="h-pairs">Partners</h2>
-    <div id="pairs"></div>
-  </section>
-
-  <section aria-labelledby="h-roster">
-    <h2 id="h-roster">Players</h2>
-    <div id="roster" class="rosterwrap"></div>
-  </section>
-
-  <section aria-labelledby="h-results">
-    <h2 id="h-results">Results</h2>
-    <div id="results"></div>
-  </section>
-
-  <section aria-labelledby="h-mode">
-    <h2 id="h-mode">Game mode</h2>
-    <div id="mode" class="rosterwrap"></div>
-  </section>
-
-  <section aria-labelledby="h-session">
-    <h2 id="h-session">Session</h2>
-    <div id="session" class="rosterwrap"></div>
-  </section>
+  <div class="tabpanel" id="panel-about" role="region" aria-label="About" hidden>
+    <div id="aboutbody" class="about"></div>
+  </div>
+  </main>
 </div>
+<nav class="tabbar" aria-label="Sections">
+  <a href="#play" id="tab-play"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="1"/><path d="M12 4v16M3 12h5M16 12h5"/></svg><span>Play</span></a>
+  <a href="#results" id="tab-results"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V13h5v7M9 20V8h6v12M15 20v-9h5v9M3 20h18"/></svg><span>Results</span></a>
+  <a href="#setup" id="tab-setup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Setup</span></a>
+  <a href="#about" id="tab-about"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>About</span></a>
+</nav>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 
 <script>
@@ -497,14 +548,32 @@ function replan(msg){
 }
 
 let toastT;
-function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2800);}
+function toast(m,action){
+  const t=$('#toast');t.innerHTML='';
+  const sp=document.createElement('span');sp.textContent=m;t.appendChild(sp);
+  if(action){const b=document.createElement('button');b.className='toastbtn';b.dataset.act=action.act;b.textContent=action.label;t.appendChild(b);}
+  t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,action?6000:2800);
+}
+function hideToast(){const t=$('#toast');t.hidden=true;clearTimeout(toastT);}
+let clearArmed=false,clearT;
+// ---------- tabs ----------
+const TABS=['play','results','setup','about'];
+let tab='play';
+const defaultTab=()=>state.started||state.history.length?'play':'setup';
+function showTab(t){
+  tab=TABS.includes(t)?t:defaultTab();
+  TABS.forEach(x=>{const pnl=$('#panel-'+x),a=$('#tab-'+x);pnl.hidden=x!==tab;if(a&&a.setAttribute){if(x===tab)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}});
+}
+function route(){showTab(typeof location!=='undefined'?location.hash.slice(1):'');try{window.scrollTo(0,0);}catch(e){}}
+function goTab(t){if(typeof location!=='undefined'&&location.hash!=='#'+t)location.hash='#'+t;else route();}
+const modeLocked=()=>!!state.plan[0]&&(state.cur.sa+state.cur.sb)>0;
 
 // ---------- render ----------
 function render(){
   const played=state.history.length,total=played+state.plan.length;
   $('#meta').textContent=state.plan.length?`Game ${played+1} of ${total}`:`${played} games played`;
-  $('#ruleline').textContent='1 court · '+rulesLine();
-  renderMode();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();
+  const r=R();$('#ruleline').textContent=`1 court · first to ${r.target}${r.deuce==='cap'?` · deuce to ${r.cap}`:r.deuce==='nocap'?' · deuce, no cap':''}${r.limit?` · ${r.limit} min`:''}`;
+  renderMode();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();renderAbout();renderShare();
 }
 function renderClock(){
   const el=$('#clock');
@@ -536,16 +605,16 @@ function renderCourt(){
     <div class="net"></div>
     <div class="half b">${g.b.map(nmBtn).join('')}</div>
   </div>
-  <div class="courtbar"><p class="note">${swapMode?(sel?`<b>${sel}</b> selected. Tap who they swap with.`:'Tap a name, then the person they swap with.'):'Tap a name to give their side the point and credit them. Use + when nobody earned it.'}</p>
+  <div class="courtbar"><p class="note">${swapMode?(sel?`<b>${sel}</b> selected. Tap who they swap with.`:'Tap a name, then the person they swap with.'):'Tap a name to give their side the point and credit that player. Tap a score when nobody in particular earned it.'}</p>
   <button class="btn ghost small" id="swapbtn" data-act="swapmode" aria-pressed="${swapMode}">${swapMode?'Done':'Change line-up'}</button></div>
   ${R().limit?`<p class="gtimer" id="gtimer" aria-live="off">${gameTimerText()}</p>`:''}
   <div class="scores">
-    ${['a','b'].map(s=>{const v=state.cur['s'+s],o=state.cur[s==='a'?'sb':'sa'];return `<div class="score">
-      <button class="step minus" id="dec-${s}" data-act="dec" data-side="${s}" aria-label="Take a point off ${g[s].join(' and ')}">−</button>
-      <output class="${v>o?'lead':''}" aria-label="${g[s].join(' and ')} score">${v}</output>
-      <button class="step plus" id="inc-${s}" data-act="inc" data-side="${s}" aria-label="Point to ${g[s].join(' and ')}">+</button></div>`}).join('')}
+    ${['a','b'].map(s=>{const v=state.cur['s'+s],o=state.cur[s==='a'?'sb':'sa'];return `<button class="score" id="score-${s}" data-act="inc" data-side="${s}" aria-label="Point to ${g[s].join(' and ')}, score ${v}"><span class="val ${v>o?'lead':''}">${v}</span><span class="who">${g[s].join(' &amp; ')}</span><span class="hint">+ point</span></button>`}).join('')}
   </div>
-  ${sa||sb?'<button class="btn ghost" id="clear" data-act="clear">Reset score to 0–0</button>':''}
+  <div class="scoreacts">
+    <button class="btn ghost" id="undopt" data-act="undopt" ${sa||sb?'':'disabled'}>Undo last point</button>
+    <button class="btn ghost" id="clear" data-act="clear" ${sa||sb?'':'disabled'}>${clearArmed?'Tap again to reset':'Reset to 0–0'}</button>
+  </div>
   ${sits.length?`<p class="sits">Sitting out: ${sits.map(s=>swapMode?`<button class="chip ${sel===s?'sel':''}" data-act="pick" data-id="${s}" aria-pressed="${sel===s}">${s}</button>`:`<span class="chip">${s}</span>`).join('')}</p>`:''}
   <button class="btn primary full" id="finish" data-act="finish">Finish game ${n}${validScore(sa,sb)?(sa===sb?' · Draw':` · ${sa>sb?pair(g.a):pair(g.b)} win`):''}</button>`;
   courtTimeUp=timeIsUp();
@@ -691,7 +760,7 @@ function renderChars(){
 }
 function renderStats(){
   const el=$('#stats'),H=state.history;
-  if(!H.length){el.innerHTML='<p class="muted">Stats appear after the first finished game.</p>';return;}
+  if(!H.length){el.innerHTML='<p class="muted">Highlights appear after the first finished game.</p>';$('#statsdetail').innerHTML='<p class="muted">Stats appear after the first finished game.</p>';return;}
   const {S,pairs,vs}=computeStats();
   const pl=Object.values(S).filter(r=>r.P);
   pl.forEach(r=>{r.wr=winRate(r);r.pfg=r.pf/r.P;r.pag=r.pa/r.P;r.pdg=(r.pf-r.pa)/r.P;r.pw=r.pf/(r.pf+r.pa||1);r.dw=r.dW+r.dL?r.dW/(r.dW+r.dL):-1;});
@@ -735,8 +804,8 @@ function renderStats(){
   if(notYet.length)line+=` Not partnered yet: ${notYet.join(', ')}.`;
   el.innerHTML=`
   <p class="muted num">${n} game${n>1?'s':''} · average score ${avgW.toFixed(1)}–${avgL.toFixed(1)}${deuceOn?` · ${deuceN} went to deuce`:''}${drawN?` · ${drawN} draw${drawN>1?'s':''}`:''}</p>
-  <div class="tiles">${tiles.map(([l,v,u,w])=>`<div class="tile"><span class="tl">${l}</span><span class="tv">${v}${u?`<span class="tu">${u}</span>`:''}</span><span class="tw">${w}</span></div>`).join('')}</div>
-  <h3 class="sub">Per player</h3>
+  <div class="tiles">${tiles.map(([l,v,u,w])=>`<div class="tile"><span class="tl">${l}</span><span class="tv">${v}${u?`<span class="tu">${u}</span>`:''}</span><span class="tw">${w}</span></div>`).join('')}</div>`;
+  $('#statsdetail').innerHTML=`
   <div class="tablebox"><table class="stat"><thead><tr>${cols.map(([key,lab])=>`<th aria-sort="${k===key?(d>0?'ascending':'descending'):'none'}"><button class="sortb" data-act="sort" data-k="${key}">${lab}${k===key?(d>0?' ▲':' ▼'):''}</button></th>`).join('')}<th class="form">Form</th></tr></thead><tbody>
   ${rows.map(r=>`<tr class="${r.id===statPlayer?'selrow':''}"><td><button class="pbtn" data-act="statp" data-id="${r.id}">${r.id}</button></td><td>${r.P}</td><td>${Math.round(r.wr*100)}%</td><td>${Math.round(r.pw*100)}%</td><td>${r.pfg.toFixed(1)}</td><td>${r.pag.toFixed(1)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td>${deuceOn?`<td>${r.dW+r.dL?`${r.dW}–${r.dL}`:'–'}</td>`:''}${anyCr?`<td>${r.crG?r.crt:'–'}</td><td>${r.crTeam?Math.round(r.crs*100)+'%':'–'}</td>`:''}<td class="form">${spark(r.form,maxM)}</td></tr>`).join('')}
   </tbody></table></div>
@@ -845,25 +914,77 @@ function saveRoster(){
 }
 function renderResults(){
   const h=state.history;
-  if(!h.length){$('#results').innerHTML='<p class="muted">Finished games show up here.</p>';return;}
-  $('#results').innerHTML=`<ol class="results">${h.map((g,i)=>({g,i})).reverse().map(({g,i})=>{
+  if(!h.length){$('#gamelist').innerHTML='<p class="muted">Finished games show up here.</p>';return;}
+  $('#gamelist').innerHTML=`<ol class="results">${h.map((g,i)=>({g,i})).reverse().map(({g,i})=>{
     const aw=g.sa>g.sb,dr=g.sa===g.sb;
     return `<li><span class="gno">G${i+1}</span><span class="line"><span class="${dr?'':aw?'w':'l'}">${pair(g.a)}</span><span class="sc">${g.sa}–${g.sb}</span><span class="${dr?'':aw?'l':'w'}">${pair(g.b)}</span>${dr||g.timed?`<span class="ts"> · ${dr?'draw':'on time'}</span>`:''}</span>${i===h.length-1?'<button class="btn ghost" data-act="undo">Undo game</button>':''}</li>`}).join('')}</ol>`;
 }
 const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
 const stepHTML=(k,val,decDis,incDis,lab)=>`<div class="stepper"><button class="step" id="${k}-dec" data-act="rule" data-k="${k}" data-d="-1" aria-label="Lower ${lab}" ${decDis?'disabled':''}>−</button><output class="num">${val}</output><button class="step" id="${k}-inc" data-act="rule" data-k="${k}" data-d="1" aria-label="Raise ${lab}" ${incDis?'disabled':''}>+</button></div>`;
-const segHTML=(k,opts,cur,lab)=>`<div class="seg" role="group" aria-label="${lab}">${opts.map(([v,t])=>`<button id="${k}-${v}" data-act="ruleset" data-k="${k}" data-v="${v}" aria-pressed="${cur===v}">${t}</button>`).join('')}</div>`;
+const segHTML=(k,opts,cur,lab,dis)=>`<div class="seg" role="group" aria-label="${lab}">${opts.map(([v,t])=>`<button id="${k}-${v}" data-act="ruleset" data-k="${k}" data-v="${v}" aria-pressed="${cur===v}" ${dis?'disabled':''}>${t}</button>`).join('')}</div>`;
 function renderMode(){
-  const r=R(),pre=PRESETS.find(p=>Object.entries(p.r).every(([k,v])=>r[k]===v));
+  const r=R(),pre=PRESETS.find(p=>Object.entries(p.r).every(([k,v])=>r[k]===v)),lk=modeLocked();
   $('#mode').innerHTML=`
-  <div class="pickrow">${PRESETS.map(p=>`<button class="chip ${pre&&pre.id===p.id?'sel':''}" id="preset-${p.id}" data-act="preset" data-id="${p.id}" aria-pressed="${!!pre&&pre.id===p.id}">${p.label}</button>`).join('')}</div>
+  ${lk?`<p class="lockednote">Game ${state.history.length+1} is in progress, so the game mode is locked. Finish it or reset its score to change the rules.</p>`:''}
+  <div class="pickrow">${PRESETS.map(p=>`<button class="chip ${pre&&pre.id===p.id?'sel':''}" id="preset-${p.id}" data-act="preset" data-id="${p.id}" aria-pressed="${!!pre&&pre.id===p.id}" ${lk?'disabled':''}>${p.label}</button>`).join('')}</div>
   <p class="rulesum">${rulesSentence()}</p>
-  <div class="setrow"><b>Points to win</b>${stepHTML('target',r.target,r.target<=5,r.target>=30,'points to win')}</div>
-  <div class="setcol"><div><b>Deuce</b><p class="muted">${r.deuce==='none'?`The first side to ${r.target} wins.`:`From ${r.target-1}–${r.target-1}, a side must win by 2.`}</p></div>${segHTML('deuce',[['none','Off'],['cap','On, capped'],['nocap','On, no cap']],r.deuce,'Deuce')}</div>
-  ${r.deuce==='cap'?`<div class="setrow"><div><b>Cap</b><p class="muted num">${r.cap}–${r.cap-1} wins the game.</p></div>${stepHTML('cap',r.cap,r.cap<=r.target+1,r.cap>=r.target+15,'cap')}</div>`:''}
-  <div class="setrow"><div><b>Time limit per game</b><p class="muted">${r.limit?'Starts at the first point of each game.':'Off. Games play to the score.'}</p></div>${stepHTML('limit',r.limit?`${r.limit}<span class="unit">min</span>`:'Off',r.limit===0,r.limit>=30,'time limit')}</div>
-  ${r.limit?`<div class="setcol"><b>Level when time is up</b>${segHTML('timeUp',[['golden','Next point wins'],['draw','Draw']],r.timeUp,'Level when time is up')}</div>`:''}
-  <p class="note">Changes apply from the game on court. Finished games keep their scores.</p>`;
+  <div class="setrow"><b>Points to win</b>${stepHTML('target',r.target,lk||r.target<=5,lk||r.target>=30,'points to win')}</div>
+  <div class="setcol"><div><b>Deuce</b><p class="muted">${r.deuce==='none'?`The first side to ${r.target} wins.`:`From ${r.target-1}–${r.target-1}, a side must win by 2.`}</p></div>${segHTML('deuce',[['none','Off'],['cap','On, capped'],['nocap','On, no cap']],r.deuce,'Deuce',lk)}</div>
+  ${r.deuce==='cap'?`<div class="setrow"><div><b>Cap</b><p class="muted num">${r.cap}–${r.cap-1} wins the game.</p></div>${stepHTML('cap',r.cap,lk||r.cap<=r.target+1,lk||r.cap>=r.target+15,'cap')}</div>`:''}
+  <div class="setrow"><div><b>Time limit per game</b><p class="muted">${r.limit?'Starts at the first point of each game.':'Off. Games play to the score.'}</p></div>${stepHTML('limit',r.limit?`${r.limit}<span class="unit">min</span>`:'Off',lk||r.limit===0,lk||r.limit>=30,'time limit')}</div>
+  ${r.limit?`<div class="setcol"><b>Level when time is up</b>${segHTML('timeUp',[['golden','Next point wins'],['draw','Draw']],r.timeUp,'Level when time is up',lk)}</div>`:''}
+  <p class="note">Changes apply from the next game. Finished games keep their scores.</p>`;
+}
+// ---------- about ----------
+const CHAR_INFO=[['The Final Boss','Top of the standings'],['Giant Killer',"Beat the night's winner"],['Robbed by the Scoreboard','Won far more points than games'],['Ice in the Veins','Won games that went to deuce'],['On Fire','The longest winning streak, 3 or more'],['The Finisher',"Won the biggest share of their side's points personally"],['Points Machine','Scored the most points'],['The Wall','Conceded the fewest points a game'],['The Pendulum','Alternated wins and losses all night'],['Strong Finisher','A much better second half of the night'],['Out of the Blocks','A much better first half of the night'],['The Metronome','The steadiest margins'],['The Rollercoaster','The wildest swings between big wins and big losses'],['Iron Lungs','Played the most points'],['The Social Butterfly, The Grafter, The Regular','When nothing else fits']];
+function renderAbout(){
+  const n=state.players.filter(p=>p.here).length,G=gamesToPairAll(n);
+  $('#aboutbody').innerHTML=`
+  <section><h2>What this is</h2>
+    <p class="lead-in">Thursday Doubles plans and scores a night of badminton doubles for 4 to 8 people sharing one court.</p>
+    <p>It picks the pairs so everyone partners everyone, keeps score on one phone, and sums up the night with standings, stats and a title for each player.</p></section>
+  <section><h2>How to use it</h2>
+    <ol>
+      <li><a href="#setup">Setup</a>: add or rename players, pick a game mode, check the session fits your booking, then tap <b>Start playing</b>.</li>
+      <li><a href="#play">Play</a>: tap a player's name when they win a point, or tap a side's score when nobody in particular earned it. Tap <b>Finish</b> when the game is over.</li>
+      <li><a href="#results">Results</a>: standings, characters and stats update after every game. Copy them for the group chat at the end.</li>
+    </ol></section>
+  <section><h2>How the pairs are chosen</h2>
+    <p>Each game uses two partnerships. With ${n} players there are ${n*(n-1)/2} possible pairs, so it takes ${G} games for everyone to partner everyone once. The app shares games out evenly and avoids anyone sitting out twice in a row where it can.</p>
+    <p>If someone arrives late or leaves early, mark them in Setup. The games after the one on court are re-planned.</p></section>
+  <section><h2>Tonight's rules</h2><p>${rulesSentence()}</p></section>
+  <section><h2>Reading the numbers</h2>
+    <dl>
+      <dt>Win %</dt><dd>Games won. A draw counts as half a win.</dd>
+      <dt>Won %</dt><dd>The share of all points played that your side won. It breaks ties in the standings, because longer games and extra games give more points.</dd>
+      <dt>±</dt><dd>Points won minus points lost.</dd>
+      <dt>Credits</dt><dd>Points won while you were tapped as the player who won them.</dd>
+      <dt>Deuce</dt><dd>Your record in games that went to deuce.</dd>
+    </dl></section>
+  <section><h2>Characters</h2>
+    <p>Everyone gets one title from the night's results. Each title goes to one player only.</p>
+    <dl>${CHAR_INFO.map(([t,d])=>`<dt>${t}</dt><dd>${d}</dd>`).join('')}</dl></section>
+  <section><h2>Your data</h2>
+    <p>Everything stays in this browser on this phone. Nothing is uploaded. Clearing browser data or using a private window loses it, so use <b>Copy session</b> in Setup to keep a backup.</p>
+    <p>If you add the website to your home screen, it also works without signal.</p></section>`;
+}
+// ---------- share results ----------
+let shareFallback='';
+function shareText(){
+  const H=state.history;if(!H.length)return '';
+  const {S}=computeStats();
+  const pl=Object.values(S).filter(r=>r.P);pl.forEach(r=>{r.wr=winRate(r);r.pw=r.pf/(r.pf+r.pa||1);r.pd=(r.pf-r.pa)/r.P;});
+  pl.sort((x,y)=>y.wr-x.wr||y.pw-x.pw||y.pd-x.pd||x.id.localeCompare(y.id));
+  const when=new Date(H[0].t||Date.now()).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  const chars=archetypes();
+  const lines=[`Thursday Doubles, ${when}`,`${H.length} game${H.length>1?'s':''} · ${rulesLine()}`,'','Standings'];
+  pl.forEach((r,i)=>lines.push(`${i+1}. ${r.id}  ${rec(r.W,r.D,r.P)}  (${Math.round(r.pw*100)}% of points)`));
+  if(chars.length){lines.push('','Characters');chars.forEach(c=>lines.push(`${c.id}: ${c.title}`));}
+  return lines.join('\n');
+}
+function renderShare(){
+  const b=$('#sharebtn');if(b)b.hidden=!state.history.length;
+  $('#share').innerHTML=shareFallback?`<div class="redit"><label class="muted" for="sharetext">Copying was blocked here. Select all of this text and copy it yourself:</label><textarea id="sharetext" class="pin ta" rows="8" readonly>${shareFallback}</textarea></div>`:'';
 }
 let resetArmed=false,resetT;
 function renderSession(){
@@ -880,9 +1001,10 @@ function renderSession(){
   }else if(left){
     status=`<span class="status short">Too long</span> About ${left-fits} game${left-fits>1?'s':''} more than the time allows.`;
     const per=avail/left-CHANGEOVER_MIN,ratio=ppg/r.target,t=Math.floor(per*60/pc.spp/ratio);
-    if(t>=5&&t<r.target)fixes.push(`<button class="btn ghost small" data-act="suggest" data-k="target" data-v="${t}">Play to ${t}</button>`);
+    const lk=modeLocked()?'disabled':'';
+    if(t>=5&&t<r.target)fixes.push(`<button class="btn ghost small" data-act="suggest" data-k="target" data-v="${t}" ${lk}>Play to ${t}</button>`);
     const L=Math.floor(per);
-    if(L>=3&&(!r.limit||L<r.limit))fixes.push(`<button class="btn ghost small" data-act="suggest" data-k="limit" data-v="${L}">${L}-min time limit</button>`);
+    if(L>=3&&(!r.limit||L<r.limit))fixes.push(`<button class="btn ghost small" data-act="suggest" data-k="limit" data-v="${L}" ${lk}>${L}-min time limit</button>`);
     if(fits>0)fixes.push(`<button class="btn ghost small" data-act="settarget" data-n="${state.history.length+fits}">Plan ${state.history.length+fits} games</button>`);
   }
   $('#session').innerHTML=`
@@ -898,6 +1020,7 @@ function renderSession(){
   <div class="setrow"><div><b>Rounds</b><p class="muted">How many times everyone partners everyone.</p></div>${stepHTML('rounds',r.rounds,r.rounds<=1,r.rounds>=4,'rounds')}</div>
   <div class="setrow"><div><b>Games tonight</b><p class="muted">Set it yourself, or use the buttons above.</p></div>
     <div class="stepper"><button class="step" id="tdec" data-act="tdec" aria-label="One game fewer" ${state.target<=min?'disabled':''}>−</button><output class="num">${state.target}</output><button class="step" id="tinc" data-act="tinc" aria-label="One game more">+</button></div></div>
+  ${!state.started&&!state.history.length?`<div class="startcard"><p><b>Ready?</b> ${nHere} players, ${state.target} games. ${rulesSentence()}</p><button class="btn primary full" id="startplay" data-act="startplay">Start playing</button></div>`:''}
     <div class="setrow"><div><b>Move or back up this session</b><p class="muted">Copy it here, then paste it into the other page or phone.</p></div>
       <div class="ractions"><button class="btn ghost" id="exportbtn" data-act="export">Copy session</button><button class="btn ghost" id="importbtn" data-act="importopen" aria-expanded="${importing}">Paste a session</button></div></div>
     ${exportText?`<div class="redit"><label class="muted" for="exporttext">Copying was blocked here. Select all of this text and copy it yourself:</label><textarea id="exporttext" class="pin ta" rows="4" readonly>${exportText}</textarea></div>`:''}
@@ -934,11 +1057,11 @@ function importSession(txt){
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
   const act=b.dataset.act;
-  if(act==='inc'){if(addPoint(b.dataset.side,null)){save();renderCourt();}return;}
+  if(act==='inc'){if(addPoint(b.dataset.side,null)){save();renderCourt();if(state.cur.sa+state.cur.sb===1)renderMode();}return;}
   if(act==='dec'){removePoint(b.dataset.side);save();renderCourt();return;}
   if(act==='credit'){
     const id=b.dataset.id,g=state.plan[0];if(!g)return;
-    if(addPoint(g.a.includes(id)?'a':'b',id)){save();renderCourt();}return;
+    if(addPoint(g.a.includes(id)?'a':'b',id)){save();renderCourt();if(state.cur.sa+state.cur.sb===1)renderMode();}return;
   }
   if(act==='swapmode'){swapMode=!swapMode;sel=null;renderCourt();return;}
   if(act==='pick'){
@@ -965,7 +1088,24 @@ document.addEventListener('click',e=>{
   if(act==='rm'){const i=+b.dataset.i;editDraft.forEach((r,j)=>{const inp=$('#pn-'+j);if(inp&&!r.rm)r.name=inp.value;});editDraft[i].rm=!editDraft[i].rm;renderRoster();return;}
   if(act==='sort'){const key=b.dataset.k,def=(key==='id'||key==='pag')?1:-1;statSort=statSort.k===key?{k:key,d:-statSort.d}:{k:key,d:def};renderStats();return;}
   if(act==='statp'){statPlayer=b.dataset.id;renderStats();return;}
-  if(act==='clear'){state.cur={sa:0,sb:0,log:[]};save();renderCourt();toast('Score reset to 0–0.');return;}
+  if(act==='clear'){
+    if(!clearArmed){clearArmed=true;renderCourt();clearTimeout(clearT);clearT=setTimeout(()=>{clearArmed=false;renderCourt();},3000);return;}
+    clearArmed=false;clearTimeout(clearT);state.cur={sa:0,sb:0,log:[]};save();renderCourt();renderMode();toast('Score reset to 0–0.');return;
+  }
+  if(act==='undopt'){
+    const L=curLog();if(!L.length)return;
+    const e=L.pop();state.cur['s'+e.s]=Math.max(0,state.cur['s'+e.s]-1);save();renderCourt();
+    if(!(state.cur.sa+state.cur.sb))renderMode();
+    toast(`Last point undone${e.by?` (${e.by})`:''}.`);return;
+  }
+  if(act==='startplay'){state.started=true;save();goTab('play');return;}
+  if(act==='gotab'){goTab(b.dataset.t);return;}
+  if(act==='share'){
+    const txt=shareText();if(!txt)return;shareFallback='';
+    const fb=()=>{shareFallback=txt;renderShare();const t=$('#sharetext');if(t&&t.select){t.focus();t.select();}};
+    try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>toast('Results copied. Paste them into your group chat.')).catch(fb);}else fb();}catch(err){fb();}
+    return;
+  }
   if(act==='finish'){
     sel=null;
     const g=state.plan[0],{sa,sb}=state.cur;
@@ -974,11 +1114,13 @@ document.addEventListener('click',e=>{
     state.history.push(Object.assign({a:g.a,b:g.b,sa,sb,t:Date.now(),to:r.target},r.deuce==='none'?{dz:false}:{},timed?{timed:true}:{},Object.keys(cr).length?{cr}:{}));
     swapMode=false;
     state.plan.shift();state.cur={sa:0,sb:0,log:[]};save();render();
-    toast(sa===sb?`Game ${state.history.length} saved. A draw at ${sa}–${sb}.`:`Game ${state.history.length} saved. ${sa>sb?g.a.join(' & '):g.b.join(' & ')} win ${Math.max(sa,sb)}–${Math.min(sa,sb)}${timed?' on time':''}.`);
+    state.started=true;
+    toast(sa===sb?`Game ${state.history.length} saved. A draw at ${sa}–${sb}.`:`Game ${state.history.length} saved. ${sa>sb?g.a.join(' & '):g.b.join(' & ')} win ${Math.max(sa,sb)}–${Math.min(sa,sb)}${timed?' on time':''}.`,{label:'Undo',act:'undo'});
     window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     return;
   }
   if(act==='undo'){
+    if(!state.history.length)return;hideToast();
     const g=state.history.pop();state.plan.unshift({a:g.a,b:g.b});
     const log=[];for(const s of ['a','b']){let n=g['s'+s];for(const id of g[s]){const c=(g.cr&&g.cr[id])||0;for(let i=0;i<c;i++){log.push({s,by:id});n--;}}for(let i=0;i<n;i++)log.push({s,by:null});}
     state.cur={sa:g.sa,sb:g.sb,log};
@@ -1006,6 +1148,7 @@ document.addEventListener('click',e=>{
   if(act==='clock'){state.clockStart=Date.now();save();renderClock();renderSession();return;}
   if(act==='rule'){
     const r=R(),k=b.dataset.k,d=+b.dataset.d;
+    if(['target','cap','limit'].includes(k)&&modeLocked()){toast('Finish the game on court before changing the game mode.');return;}
     if(k==='target'){const off=Math.max(1,r.cap-r.target);r.target=clamp(r.target+d,5,30);r.cap=Math.min(99,r.target+off);}
     if(k==='cap')r.cap=clamp(r.cap+d,r.target+1,r.target+15);
     if(k==='limit')r.limit=r.limit===0?(d>0?5:0):(d<0&&r.limit<=5?0:clamp(r.limit+d,5,30));
@@ -1018,30 +1161,32 @@ document.addEventListener('click',e=>{
     }
     save();render();return;
   }
-  if(act==='ruleset'){const r=R();r[b.dataset.k]=b.dataset.v;save();render();return;}
+  if(act==='ruleset'){if(modeLocked()){toast('Finish the game on court before changing the game mode.');return;}const r=R();r[b.dataset.k]=b.dataset.v;save();render();return;}
   if(act==='preset'){
     const p=PRESETS.find(x=>x.id===b.dataset.id);if(!p)return;
+    if(modeLocked()){toast('Finish the game on court before changing the game mode.');return;}
     Object.assign(R(),p.r);save();render();toast(`${p.label}: ${rulesLine()}.`);return;
   }
   if(act==='suggest'){
     const r=R(),k=b.dataset.k,v=+b.dataset.v;
+    if(modeLocked()){toast('Finish the game on court before changing the game mode.');return;}
     if(k==='target'){const off=Math.max(1,r.cap-r.target);r.target=clamp(v,5,30);r.cap=Math.min(99,r.target+off);toast(`Games are now to ${r.target}.`);}
     if(k==='limit'){r.limit=clamp(v,3,30);toast(`Games now stop after ${r.limit} minutes.`);}
     save();render();return;
   }
   if(act==='reset'){
     if(!resetArmed){resetArmed=true;renderSession();clearTimeout(resetT);resetT=setTimeout(()=>{resetArmed=false;renderSession();},3500);return;}
-    resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>p.id),state.rules);save();render();toast('New session started. Players and game mode are kept.');return;
+    resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>p.id),state.rules);save();render();goTab('setup');toast('New session ready. Players and game mode are kept.');return;
   }
 });
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('.tabbar a');if(a&&a.getAttribute&&typeof location!=='undefined'&&a.getAttribute('href')===location.hash){e.preventDefault();window.scrollTo({top:0,behavior:'smooth'});}});
 document.addEventListener('submit',e=>{
   if(e.target.id==='rosterform'){e.preventDefault();saveRoster();}
   if(e.target.id==='importform'){
     e.preventDefault();
     const err=importSession(($('#importtext')||{}).value||'');
     if(err){importErr=err;renderSession();return;}
-    importing=false;importErr='';save();render();toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
-    window.scrollTo({top:0});
+    importing=false;importErr='';state.started=state.history.length>0;save();render();goTab(state.plan.length?'play':'results');toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
   }
 });
 setInterval(()=>{if(!state)return;renderClock();if(state.clockStart&&!importing&&!exportText&&!resetArmed)renderSession();},20000);
@@ -1060,8 +1205,9 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 
 function start(data){
   state=(data&&data.key===KEY&&data.state)||load()||initial();
-  render();
+  render();route();
 }
+if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('hashchange',route);
 window.claude?.hot?.snapshot?.(()=>({state,key:KEY}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 </script>
