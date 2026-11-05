@@ -177,6 +177,30 @@ table{border-collapse:collapse;width:100%}
 .rerr{margin:0;color:var(--warn);font-weight:500}
 .ractions{display:flex;gap:8px;flex-wrap:wrap}
 .pin.ta{padding:10px 12px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;resize:vertical;width:100%}
+/* game mode, session planner */
+a.eyebrow{text-decoration:none}
+a.eyebrow:hover{text-decoration:underline;text-underline-offset:3px}
+a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:4px}
+.setcol{display:flex;flex-direction:column;gap:8px}
+.setrow>div:first-child{flex:1 1 11rem;min-width:0}
+.setrow>div:first-child p{margin:2px 0 0}
+.setrow>.stepper{flex-shrink:0}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{flex:1;min-height:44px;padding:4px 8px;font-size:.92rem;font-weight:500;color:var(--muted);border-left:1px solid var(--line);line-height:1.2}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.rulesum{margin:0;font-weight:500}
+.stepper output .unit{font-family:var(--font-body);font-size:.8rem;font-weight:500;color:var(--muted);margin-left:3px}
+.step:disabled{opacity:.35;cursor:default}
+.planbox{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--line)}
+.planrow{display:grid;grid-template-columns:5.2rem minmax(0,1fr);gap:8px;align-items:baseline}
+.planrow .tl{font-size:.75rem}
+.planstatus{margin:4px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px}
+.status{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.status.ok{background:var(--accent-soft);color:var(--accent)}
+.status.short{background:var(--warn-soft);color:var(--warn)}
+.gtimer{margin:0;padding:8px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.gtimer b{font-family:var(--font-display);font-size:1.15rem;font-weight:700}
 /* characters */
 .chars{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border-top:1px solid var(--line)}
 .chars li{display:grid;grid-template-columns:4.2rem minmax(0,1fr);gap:2px 12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:baseline}
@@ -214,7 +238,7 @@ table{border-collapse:collapse;width:100%}
 <body>
 <div class="wrap">
   <header>
-    <span class="eyebrow">1 court · first to 15 · deuce from 14–14, capped at 20</span>
+    <a class="eyebrow" id="ruleline" href="#h-mode">1 court · first to 15</a>
     <h1>Thursday Doubles</h1>
     <div class="hrow"><span id="meta" class="num"></span><span id="clock"></span></div>
   </header>
@@ -261,9 +285,14 @@ table{border-collapse:collapse;width:100%}
     <div id="results"></div>
   </section>
 
+  <section aria-labelledby="h-mode">
+    <h2 id="h-mode">Game mode</h2>
+    <div id="mode" class="rosterwrap"></div>
+  </section>
+
   <section aria-labelledby="h-session">
     <h2 id="h-session">Session</h2>
-    <div id="session"></div>
+    <div id="session" class="rosterwrap"></div>
   </section>
 </div>
 <div id="toast" role="status" aria-live="polite" hidden></div>
@@ -341,15 +370,75 @@ function planGames(players,history,count,opts={}){
 // ---------- state ----------
 const KEY='thursday-doubles-v2';
 const DEFAULT_NAMES=['Fat','Mire','Git','Ses','Don','Mand','Audi'];
-const MAX_PLAYERS=8,MIN_PLAYERS=4,SESSION_MIN=120;
+const MAX_PLAYERS=8,MIN_PLAYERS=4;
 const NAME_RE=/^[\p{L}\p{N}][\p{L}\p{N} .'\-]{0,11}$/u;
 let state,sel=null,swapMode=false,editing=false,editDraft=null,editErr='';
 // games needed for every pair to partner once: n players → n(n−1)/2 pairs, 2 pairs a game
 const gamesToPairAll=n=>Math.ceil(n*(n-1)/4);
-function newSession(names){
+
+// ---------- game mode ----------
+// deuce: 'none' = first to target; 'cap' = from target−1 all win by 2, up to cap; 'nocap' = win by 2, no limit
+// limit: minutes per game (0 = off); timeUp: what a level score means when time runs out ('golden' = next point wins, 'draw')
+const DEFAULT_RULES={target:15,deuce:'cap',cap:20,limit:0,timeUp:'golden',sessionMin:120,warmup:0,rounds:1};
+const PRESETS=[
+  {id:'club15',label:'Club 15',r:{target:15,deuce:'cap',cap:20,limit:0}},
+  {id:'quick11',label:'Quick 11',r:{target:11,deuce:'cap',cap:15,limit:0}},
+  {id:'bwf21',label:'Official 21',r:{target:21,deuce:'cap',cap:30,limit:0}},
+  {id:'timed',label:'Timed 10 min',r:{target:21,deuce:'cap',cap:30,limit:10,timeUp:'draw'}},
+];
+const CHANGEOVER_MIN=1,DEFAULT_SPP=22;
+function sanitizeRules(x){
+  const r={...DEFAULT_RULES},o=x&&typeof x==='object'?x:{};
+  const int=(v,lo,hi)=>Number.isInteger(v)&&v>=lo&&v<=hi;
+  if(int(o.target,3,50))r.target=o.target;
+  if(['none','cap','nocap'].includes(o.deuce))r.deuce=o.deuce;
+  r.cap=int(o.cap,r.target+1,99)?o.cap:Math.max(r.target+1,Math.min(99,r.target+(DEFAULT_RULES.cap-DEFAULT_RULES.target)));
+  if(int(o.limit,0,60))r.limit=o.limit;
+  if(['golden','draw'].includes(o.timeUp))r.timeUp=o.timeUp;
+  if(int(o.sessionMin,30,480))r.sessionMin=o.sessionMin;
+  if(int(o.warmup,0,120))r.warmup=o.warmup;
+  if(int(o.rounds,1,4))r.rounds=o.rounds;
+  return r;
+}
+function R(){if(!state.rules)state.rules=sanitizeRules(null);return state.rules;}
+const maxPts=(r=R())=>r.deuce==='none'?r.target:r.deuce==='cap'?r.cap:99;
+// a finished score under the points rules alone
+function regularWin(a,b,r=R()){
+  const hi=Math.max(a,b),lo=Math.min(a,b),t=r.target;
+  if(hi===lo)return false;
+  if(r.deuce==='none')return hi===t;
+  if(hi===t&&lo<=t-2)return true;
+  if(lo>=t-1&&hi-lo===2&&(r.deuce==='nocap'||hi<=r.cap))return true;
+  return r.deuce==='cap'&&hi===r.cap&&lo===r.cap-1;
+}
+// per-game timer starts at the first point of the game
+const gameMsLeft=()=>R().limit&&state.cur.start?R().limit*60000-(Date.now()-state.cur.start):null;
+const timeIsUp=()=>{const l=gameMsLeft();return l!==null&&l<=0;};
+function validScore(a,b){
+  if(regularWin(a,b))return true;
+  return timeIsUp()&&(a!==b||R().timeUp==='draw');
+}
+function rulesLine(r=R()){
+  let s=r.deuce==='none'?`First to ${r.target}`:`First to ${r.target} · deuce from ${r.target-1}–${r.target-1}${r.deuce==='cap'?`, capped at ${r.cap}`:', no cap'}`;
+  if(r.limit)s+=` · ${r.limit}-min games, ${r.timeUp==='draw'?'level at time is a draw':'level at time plays one more point'}`;
+  return s;
+}
+function rulesSentence(r=R()){
+  let s=r.deuce==='none'?`First to ${r.target} wins.`:`First to ${r.target}. From ${r.target-1}–${r.target-1}, win by 2${r.deuce==='cap'?`, up to ${r.cap} (${r.cap}–${r.cap-1} wins)`:''}.`;
+  if(r.limit)s+=` Games stop after ${r.limit} minutes: the side ahead wins${r.timeUp==='draw'?', and a level score is a draw.':', and if level, the next point wins.'}`;
+  return s;
+}
+// deuce games, judged by the rules the game was played under
+const isDeuce=g=>g.dz!==false&&g.sa!==g.sb&&Math.min(g.sa,g.sb)>=(g.to||15)-1;
+const winRate=r=>r.P?(r.W+0.5*(r.D||0))/r.P:0;
+const rec=(W,D,P,three)=>D||three?`${W}–${D||0}–${P-W-(D||0)}`:`${W}–${P-W}`;
+const anyDraws=()=>state.history.some(g=>g.sa===g.sb);
+
+function newSession(names,rules){
   const players=names.map(n=>({id:n,here:true,offset:0}));
-  const target=gamesToPairAll(players.length);
-  return {players,history:[],plan:planGames(players,[],target),cur:{sa:0,sb:0,log:[]},target,clockStart:null};
+  const r=sanitizeRules(rules);
+  const target=r.rounds*gamesToPairAll(players.length);
+  return {players,history:[],plan:planGames(players,[],target),cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:r};
 }
 function initial(){return newSession(DEFAULT_NAMES);}
 // point log for the game on court: one entry per point, with who won it when someone was credited
@@ -357,14 +446,36 @@ function curLog(){if(!state.cur.log)state.cur.log=[];return state.cur.log;}
 function credits(log){const c={};(log||[]).forEach(e=>{if(e.by)c[e.by]=(c[e.by]||0)+1;});return c;}
 function addPoint(side,by){
   const {sa,sb}=state.cur;
-  if(validScore(sa,sb)){toast(`Game over at ${Math.max(sa,sb)}–${Math.min(sa,sb)}. Tap Finish to save it.`);return false;}
-  if(state.cur['s'+side]>=20){toast('Scores stop at 20.');return false;}
+  if(validScore(sa,sb)){toast(sa===sb?`Time's up at ${sa}–${sb}: a draw. Tap Finish to save it.`:`Game over at ${Math.max(sa,sb)}–${Math.min(sa,sb)}. Tap Finish to save it.`);return false;}
+  if(state.cur['s'+side]>=maxPts()){toast(`Scores stop at ${maxPts()}.`);return false;}
+  if(!state.cur.start)state.cur.start=Date.now();
   state.cur['s'+side]++;curLog().push({s:side,by:by||null});return true;
 }
 function removePoint(side){
   const k='s'+side;if(state.cur[k]<=0)return;state.cur[k]--;
   const L=curLog();for(let i=L.length-1;i>=0;i--)if(L[i].s===side){L.splice(i,1);break;}
 }
+
+// ---------- session planner: how long a game takes, and how many fit ----------
+function pace(){
+  // seconds per point, learned from the gaps between finished games (minus the changeover)
+  const H=state.history.filter(g=>g.t);const xs=[];
+  for(let i=1;i<H.length;i++){const gap=(H[i].t-H[i-1].t)/1000,pts=H[i].sa+H[i].sb;if(gap>=120&&gap<=1800&&pts>0)xs.push((gap-CHANGEOVER_MIN*60)/pts);}
+  if(xs.length<3)return {spp:DEFAULT_SPP,n:0};
+  xs.sort((a,b)=>a-b);return {spp:Math.min(60,Math.max(8,xs[Math.floor(xs.length/2)])),n:xs.length};
+}
+function pointsPerGame(r=R()){
+  // average points in a game to this target, from your own games when there are a few
+  const same=state.history.filter(g=>(g.to||15)===r.target&&!g.timed);
+  if(same.length>=3)return same.reduce((s,g)=>s+g.sa+g.sb,0)/same.length;
+  return Math.min(r.target*1.75,maxPts(r)*2-1);
+}
+function gameMinutes(r=R()){
+  const {spp}=pace();let m=pointsPerGame(r)*spp/60;
+  if(r.limit)m=Math.min(m,r.limit);
+  return m+CHANGEOVER_MIN;
+}
+const fmtDur=m=>{m=Math.round(m);const h=Math.floor(m/60),mm=m%60;return h?`${h}h${mm?` ${mm}m`:''}`:`${mm} min`;};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 function load(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return null}}
 const $=s=>document.querySelector(s);
@@ -392,15 +503,18 @@ function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeou
 function render(){
   const played=state.history.length,total=played+state.plan.length;
   $('#meta').textContent=state.plan.length?`Game ${played+1} of ${total}`:`${played} games played`;
-  renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();
+  $('#ruleline').textContent='1 court · '+rulesLine();
+  renderMode();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();
 }
 function renderClock(){
   const el=$('#clock');
-  if(!state.clockStart){el.innerHTML='<button class="pill" data-act="clock">Start 2-hour clock</button>';return;}
-  const left=Math.round(SESSION_MIN-(Date.now()-state.clockStart)/60000);
+  const r=R();
+  if(!state.clockStart){el.innerHTML=`<button class="pill" data-act="clock">Start ${fmtDur(r.sessionMin)} clock</button>`;return;}
+  const el_=(Date.now()-state.clockStart)/60000,left=Math.round(r.sessionMin-el_),warm=Math.ceil(r.warmup-el_);
   if(left<=0){el.innerHTML='<span class="pill done">Time’s up</span>';return;}
-  const g=state.plan.length,h=Math.floor(left/60),m=left%60;
-  el.innerHTML=`<span class="pill num"><b>${h}:${String(m).padStart(2,'0')}</b> left${g?` · about ${Math.floor(left/g)} min a game`:''}</span>`;
+  if(warm>0){el.innerHTML=`<span class="pill num">Warm-up · games start in <b>${warm} min</b></span>`;return;}
+  const g=state.plan.length,h=Math.floor(left/60),m=left%60,per=g?left/g:0,behind=g&&per<gameMinutes()-0.5;
+  el.innerHTML=`<span class="pill num ${behind?'done':''}"><b>${h}:${String(m).padStart(2,'0')}</b> left${g?` · ${Math.floor(per)} min a game${behind?', behind':''}`:''}</span>`;
 }
 function renderArrivals(){
   const st=buildStats(state.players,state.history);
@@ -424,6 +538,7 @@ function renderCourt(){
   </div>
   <div class="courtbar"><p class="note">${swapMode?(sel?`<b>${sel}</b> selected. Tap who they swap with.`:'Tap a name, then the person they swap with.'):'Tap a name to give their side the point and credit them. Use + when nobody earned it.'}</p>
   <button class="btn ghost small" id="swapbtn" data-act="swapmode" aria-pressed="${swapMode}">${swapMode?'Done':'Change line-up'}</button></div>
+  ${R().limit?`<p class="gtimer" id="gtimer" aria-live="off">${gameTimerText()}</p>`:''}
   <div class="scores">
     ${['a','b'].map(s=>{const v=state.cur['s'+s],o=state.cur[s==='a'?'sb':'sa'];return `<div class="score">
       <button class="step minus" id="dec-${s}" data-act="dec" data-side="${s}" aria-label="Take a point off ${g[s].join(' and ')}">−</button>
@@ -432,7 +547,15 @@ function renderCourt(){
   </div>
   ${sa||sb?'<button class="btn ghost" id="clear" data-act="clear">Reset score to 0–0</button>':''}
   ${sits.length?`<p class="sits">Sitting out: ${sits.map(s=>swapMode?`<button class="chip ${sel===s?'sel':''}" data-act="pick" data-id="${s}" aria-pressed="${sel===s}">${s}</button>`:`<span class="chip">${s}</span>`).join('')}</p>`:''}
-  <button class="btn primary full" id="finish" data-act="finish">Finish game ${n}${validScore(sa,sb)?` · ${sa>sb?pair(g.a):pair(g.b)} win`:''}</button>`;
+  <button class="btn primary full" id="finish" data-act="finish">Finish game ${n}${validScore(sa,sb)?(sa===sb?' · Draw':` · ${sa>sb?pair(g.a):pair(g.b)} win`):''}</button>`;
+  courtTimeUp=timeIsUp();
+}
+let courtTimeUp=false;
+function gameTimerText(){
+  const r=R(),l=gameMsLeft();
+  if(l===null)return `<b>${r.limit}:00</b> game timer starts at the first point`;
+  if(l<=0){const {sa,sb}=state.cur;return `<b>Time's up.</b> ${sa!==sb?'The side ahead wins.':r.timeUp==='draw'?'Level, so it is a draw.':'Level, so the next point wins.'}`;}
+  const s=Math.ceil(l/1000);return `<b>${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}</b> left in this game`;
 }
 function nmBtn(id){
   if(swapMode)return `<button class="nm ${sel===id?'sel':''}" data-act="pick" data-id="${id}" aria-pressed="${sel===id}">${id}</button>`;
@@ -448,44 +571,43 @@ function renderNext(){
 }
 function renderStandings(){
   const rows={};
-  state.players.forEach(p=>rows[p.id]={id:p.id,P:0,W:0,pf:0,pa:0,here:p.here});
+  state.players.forEach(p=>rows[p.id]={id:p.id,P:0,W:0,D:0,pf:0,pa:0,here:p.here});
   for(const g of state.history){
     for(const [side,other,sf,so] of [[g.a,g.b,g.sa,g.sb],[g.b,g.a,g.sb,g.sa]]){
-      for(const id of side){const r=rows[id];r.P++;r.pf+=sf;r.pa+=so;if(sf>so)r.W++;}
+      for(const id of side){const r=rows[id];r.P++;r.pf+=sf;r.pa+=so;if(sf>so)r.W++;else if(sf===so)r.D++;}
     }
   }
   const list=Object.values(rows).filter(r=>r.here||r.P);
-  const wr=r=>r.P?r.W/r.P:-1,pw=r=>r.pf+r.pa?r.pf/(r.pf+r.pa):0,pd=r=>r.P?(r.pf-r.pa)/r.P:0;
+  const wr=r=>r.P?winRate(r):-1,pw=r=>r.pf+r.pa?r.pf/(r.pf+r.pa):0,pd=r=>r.P?(r.pf-r.pa)/r.P:0;
   list.sort((x,y)=>wr(y)-wr(x)||pw(y)-pw(x)||pd(y)-pd(x)||x.id.localeCompare(y.id));
-  const any=state.history.length>0;
-  $('#standings').innerHTML=`<div class="tablebox"><table class="stand"><thead><tr><th>#</th><th>Player</th><th>Played</th><th>W–L</th><th>Pts</th><th>Won %</th><th>±</th></tr></thead><tbody>
-    ${list.map((r,i)=>{const d=r.pf-r.pa;return `<tr class="${any&&i===0&&r.P?'top':''}"><td>${r.P?i+1:'–'}</td><td>${r.id}</td><td>${r.P}</td><td>${r.W}–${r.P-r.W}</td><td>${r.pf}</td><td>${r.P?Math.round(pw(r)*100)+'%':'–'}</td><td class="${d>0?'pos':d<0?'neg':''}">${d>0?'+':''}${d}</td></tr>`}).join('')}
+  const any=state.history.length>0,dr=anyDraws();
+  $('#standings').innerHTML=`<div class="tablebox"><table class="stand"><thead><tr><th>#</th><th>Player</th><th>Played</th><th>${dr?'W–D–L':'W–L'}</th><th>Pts</th><th>Won %</th><th>±</th></tr></thead><tbody>
+    ${list.map((r,i)=>{const d=r.pf-r.pa;return `<tr class="${any&&i===0&&r.P?'top':''}"><td>${r.P?i+1:'–'}</td><td>${r.id}</td><td>${r.P}</td><td>${rec(r.W,r.D,r.P,dr)}</td><td>${r.pf}</td><td>${r.P?Math.round(pw(r)*100)+'%':'–'}</td><td class="${d>0?'pos':d<0?'neg':''}">${d>0?'+':''}${d}</td></tr>`}).join('')}
   </tbody></table></div>
-  <p class="note">Everyone banks their pair's points each game. Ranked by win rate, then Won %, the share of all points played that their side won. That is fairer than total points, because deuce games run longer and some people play one game more.</p>`;
+  <p class="note">Everyone banks their pair's points each game. Ranked by win rate${dr?' (a draw counts as half a win)':''}, then Won %, the share of all points played that their side won. That is fairer than total points, because longer games give everyone more points and some people play one game more.</p>`;
 }
 // ---------- stats ----------
 let statSort={k:'pw',d:-1},statPlayer=null;
-// House rules: first to 15; from 14–14 win by 2, capped at 20 (20–19 wins)
-function validScore(a,b){const hi=Math.max(a,b),lo=Math.min(a,b);return (hi===15&&lo<=13)||(lo>=14&&hi-lo===2&&hi<=20)||(hi===20&&lo===19);}
 const sgn=(x,dp=1)=>(x>0?'+':x<0?'−':'')+Math.abs(x).toFixed(dp);
 const names=a=>a.join(' &amp; ');
 function computeStats(){
   const S={},pairs={},vs={};
-  state.players.forEach(p=>S[p.id]={id:p.id,P:0,W:0,pf:0,pa:0,form:[],dW:0,dL:0,cur:0,bestStreak:0,crt:0,crTeam:0,crG:0});
+  state.players.forEach(p=>S[p.id]={id:p.id,P:0,W:0,D:0,pf:0,pa:0,form:[],dW:0,dL:0,cur:0,bestStreak:0,crt:0,crTeam:0,crG:0});
   state.history.forEach((g,gi)=>{
+    const deuce=isDeuce(g);
     for(const [side,other,sf,so] of [[g.a,g.b,g.sa,g.sb],[g.b,g.a,g.sb,g.sa]]){
-      const win=sf>so,m=sf-so,deuce=Math.min(sf,so)>=14;
+      const win=sf>so,draw=sf===so,m=sf-so;
       for(const id of side){
         const r=S[id];r.P++;r.pf+=sf;r.pa+=so;r.form.push({g:gi+1,m});
         if(g.cr){r.crt+=g.cr[id]||0;r.crTeam+=sf;r.crG++;}
-        if(win){r.W++;r.cur=r.cur>0?r.cur+1:1;}else{r.cur=r.cur<0?r.cur-1:-1;}
+        if(win){r.W++;r.cur=r.cur>0?r.cur+1:1;}else if(draw){r.D++;r.cur=0;}else{r.cur=r.cur<0?r.cur-1:-1;}
         r.bestStreak=Math.max(r.bestStreak,r.cur);
         if(deuce){if(win)r.dW++;else r.dL++;}
-        for(const o of other){const k=id+'>'+o;vs[k]=vs[k]||{G:0,W:0,pd:0};vs[k].G++;if(win)vs[k].W++;vs[k].pd+=m;}
+        for(const o of other){const k=id+'>'+o;vs[k]=vs[k]||{G:0,W:0,D:0,pd:0};vs[k].G++;if(win)vs[k].W++;if(draw)vs[k].D++;vs[k].pd+=m;}
       }
       const k=pk(side[0],side[1]);
-      pairs[k]=pairs[k]||{ids:[...side].sort(),G:0,W:0,pd:0};
-      pairs[k].G++;if(win)pairs[k].W++;pairs[k].pd+=m;
+      pairs[k]=pairs[k]||{ids:[...side].sort(),G:0,W:0,D:0,pd:0};
+      pairs[k].G++;if(win)pairs[k].W++;if(draw)pairs[k].D++;pairs[k].pd+=m;
     }
   });
   return {S,pairs,vs};
@@ -499,19 +621,19 @@ function leaders(arr,f,max){
 }
 function spark(form,maxM){
   const w=6,gap=2,h=28,mid=h/2,sc=(mid-1)/maxM,W=Math.max(form.length*(w+gap)-gap,1);
-  return `<svg class="spark" width="${W}" height="${h}" viewBox="0 0 ${W} ${h}" role="img" aria-label="Margin each game: ${form.map(f=>sgn(f.m,0)).join(', ')}"><line x1="0" x2="${W}" y1="${mid}" y2="${mid}" style="stroke:var(--line)" stroke-width="1"/>${form.map((f,i)=>{const bh=Math.max(2,Math.abs(f.m)*sc),y=f.m>0?mid-bh:mid;return `<rect x="${i*(w+gap)}" y="${y.toFixed(1)}" width="${w}" height="${bh.toFixed(1)}" rx="1.5" style="fill:var(${f.m>0?'--up':'--down'})"><title>G${f.g}: ${sgn(f.m,0)}</title></rect>`}).join('')}</svg>`;
+  return `<svg class="spark" width="${W}" height="${h}" viewBox="0 0 ${W} ${h}" role="img" aria-label="Margin each game: ${form.map(f=>sgn(f.m,0)).join(', ')}"><line x1="0" x2="${W}" y1="${mid}" y2="${mid}" style="stroke:var(--line)" stroke-width="1"/>${form.map((f,i)=>{if(f.m===0)return `<rect x="${i*(w+gap)}" y="${mid-2}" width="${w}" height="4" rx="1.5" style="fill:var(--muted)"><title>G${f.g}: draw</title></rect>`;const bh=Math.max(2,Math.abs(f.m)*sc),y=f.m>0?mid-bh:mid;return `<rect x="${i*(w+gap)}" y="${y.toFixed(1)}" width="${w}" height="${bh.toFixed(1)}" rx="1.5" style="fill:var(${f.m>0?'--up':'--down'})"><title>G${f.g}: ${sgn(f.m,0)}</title></rect>`}).join('')}</svg>`;
 }
 // ---------- characters: one fun title each, earned from the night's results ----------
 function archetypes(){
   const H=state.history;if(H.length<2)return [];
   const {S}=computeStats();
   const pl=Object.values(S).filter(r=>r.P);
-  pl.forEach(r=>{r.wr=r.W/r.P;r.pw=r.pf/(r.pf+r.pa||1);r.pdg=(r.pf-r.pa)/r.P;r.crs=r.crTeam?r.crt/r.crTeam:-1;});
+  pl.forEach(r=>{r.wr=winRate(r);r.pw=r.pf/(r.pf+r.pa||1);r.pdg=(r.pf-r.pa)/r.P;r.crs=r.crTeam?r.crt/r.crTeam:-1;});
   const ranked=[...pl].sort((x,y)=>y.wr-x.wr||y.pw-x.pw||y.pdg-x.pdg||x.id.localeCompare(y.id));
   const rank=id=>ranked.findIndex(r=>r.id===id),top=ranked[0];
   const res=r=>H.map((g,i)=>({g,i})).filter(({g})=>g.a.includes(r.id)||g.b.includes(r.id)).map(({g,i})=>{
     const inA=g.a.includes(r.id),sf=inA?g.sa:g.sb,so=inA?g.sb:g.sa;
-    return {i,sf,so,win:sf>so,m:sf-so,opp:inA?g.b:g.a,mate:(inA?g.a:g.b).find(x=>x!==r.id)};});
+    return {i,sf,so,win:sf>so,m:sf-so,dz:isDeuce(g),opp:inA?g.b:g.a,mate:(inA?g.a:g.b).find(x=>x!==r.id)};});
   const posBy=(arr,f,desc)=>{const s=[...arr].sort((x,y)=>desc?f(y)-f(x):f(x)-f(y));return id=>s.findIndex(r=>r.id===id);};
   const sd=a=>{const m=a.reduce((s,x)=>s+x,0)/a.length;return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/a.length);};
   const gtxt=x=>`${Math.max(x.sf,x.so)}–${Math.min(x.sf,x.so)} in game ${x.i+1}`;
@@ -525,24 +647,24 @@ function archetypes(){
   const closestI=H.reduce((b,g,i)=>mg(g)<mg(H[b])||(mg(g)===mg(H[b])&&g.sa+g.sb>H[b].sa+H[b].sb)?i:b,0);
   const C=[],add=(id,key,title,score,why)=>C.push({id,key,title,score,why});
   for(const r of pl){
-    const G=R[r.id],L=r.P-r.W;
+    const G=R[r.id];
     if(r===top&&r.W>0){
-      const beat=new Set();G.filter(x=>!x.win).forEach(x=>x.opp.forEach(o=>beat.add(o)));
-      add(r.id,'boss','The Final Boss',100,`Top of the table at ${r.W}–${L}. ${beat.size?`Only ${[...beat].join(' and ')} managed to beat them.`:'Nobody beat them all night.'}`);
+      const beat=new Set();G.filter(x=>x.m<0).forEach(x=>x.opp.forEach(o=>beat.add(o)));
+      add(r.id,'boss','The Final Boss',100,`Top of the table at ${rec(r.W,r.D,r.P)}. ${beat.size?`Only ${[...beat].join(' and ')} managed to beat them.`:'Nobody beat them all night.'}`);
     }
     if(r!==top){
       const k=G.filter(x=>x.win&&x.opp.includes(top.id));
       if(k.length)add(r.id,'giant','Giant Killer',90+rank(r.id),`Beat ${top.id}, the night's winner, ${gtxt(k[0])}.${k.length>1?` Then did it again.`:''}`);
     }
     if(r.wr<0.5&&r.pw-r.wr>=0.1)add(r.id,'robbed','Robbed by the Scoreboard',60+(r.pw-r.wr)*100,`Won ${Math.round(r.pw*100)}% of the points but ${r.W} of ${r.P} games. The scoreboard owes them one.`);
-    const dw=G.filter(x=>x.win&&Math.min(x.sf,x.so)>=14);
+    const dw=G.filter(x=>x.win&&x.dz);
     if(dw.length)add(r.id,'ice','Ice in the Veins',60+dw.length*5+(dw.some(x=>x.i===closestI)?10:0),dw.length>1?`Won ${dw.length} deuce games, including ${gtxt(dw[0])}.`:`Kept their nerve in deuce: won ${gtxt(dw[0])}.`);
     if(r.bestStreak>=3&&r.bestStreak===maxStreak)add(r.id,'fire','On Fire',65+r.bestStreak,`${r.bestStreak} wins in a row, the ${streakers>1?'joint-':''}longest streak of the night.`);
     const pp=ptsPos(r.id);if(pp<=2)add(r.id,'pts','Points Machine',70-pp*8,(()=>{const above=pl.filter(x=>x.pf>r.pf).length,tied=pl.filter(x=>x.pf===r.pf).length>1;
       return `${r.pf} points scored, ${above===0&&!tied?'more than anyone':`the ${tied?'joint ':''}${['most','second most','third most'][Math.min(above,2)]} of anyone`}.`;})());
     const rp=rallyPos(r.id);if(rp<=1)add(r.id,'lungs','Iron Lungs',55-rp*8,`Played ${r.pf+r.pa} points, ${rp===0?'more than anyone':'nearly the most of anyone'}.`);
     const wp=wallPos(r.id);if(wp<=2)add(r.id,'wall','The Wall',68-wp*8,`Gave away just ${(r.pa/r.P).toFixed(1)} points a game.`);
-    if(G.length>=4&&G.every((x,i)=>i===0||x.win!==G[i-1].win))add(r.id,'pend','The Pendulum',72,`${G.map(x=>x.win?'W':'L').join(' ')}. Never the same result twice in a row.`);
+    if(G.length>=4&&G.every(x=>x.m!==0)&&G.every((x,i)=>i===0||x.win!==G[i-1].win))add(r.id,'pend','The Pendulum',72,`${G.map(x=>x.win?'W':'L').join(' ')}. Never the same result twice in a row.`);
     if(r.crG>=2&&r.crt>0){const fp=finPos(r.id);if(fp<=1)add(r.id,'finisher','The Finisher',76-fp*8,`Won ${Math.round(r.crs*100)}% of their side's points personally.`);}
     if(r.P>=4){
       const c=calmPos(r.id);if(c<=1)add(r.id,'metro','The Metronome',58-c*8,`Every game decided by ${Math.max(...G.map(x=>Math.abs(x.m)))} points or fewer.`);
@@ -572,52 +694,53 @@ function renderStats(){
   if(!H.length){el.innerHTML='<p class="muted">Stats appear after the first finished game.</p>';return;}
   const {S,pairs,vs}=computeStats();
   const pl=Object.values(S).filter(r=>r.P);
-  pl.forEach(r=>{r.wr=r.W/r.P;r.pfg=r.pf/r.P;r.pag=r.pa/r.P;r.pdg=(r.pf-r.pa)/r.P;r.pw=r.pf/(r.pf+r.pa||1);r.dw=r.dW+r.dL?r.dW/(r.dW+r.dL):-1;});
+  pl.forEach(r=>{r.wr=winRate(r);r.pfg=r.pf/r.P;r.pag=r.pa/r.P;r.pdg=(r.pf-r.pa)/r.P;r.pw=r.pf/(r.pf+r.pa||1);r.dw=r.dW+r.dL?r.dW/(r.dW+r.dL):-1;});
   const n=H.length,mg=g=>Math.abs(g.sa-g.sb);
   const avgW=H.reduce((s,g)=>s+Math.max(g.sa,g.sb),0)/n,avgL=H.reduce((s,g)=>s+Math.min(g.sa,g.sb),0)/n;
-  const deuceN=H.filter(g=>Math.min(g.sa,g.sb)>=14).length;
+  const deuceN=H.filter(isDeuce).length,drawN=H.filter(g=>g.sa===g.sb).length;
+  const deuceOn=R().deuce!=='none'||deuceN>0;
   const who=a=>a.map(r=>r.id).join(', ');
   const sc=leaders(pl,r=>r.pw,true),dk=leaders(pl,r=>r.dW,true),st=leaders(pl,r=>r.bestStreak,true);
   const pr=Object.values(pairs).sort((x,y)=>y.pd/y.G-x.pd/x.G||y.G-x.G)[0];
   const gi=H.map((g,i)=>({g,i}));
   const big=gi.reduce((b,x)=>mg(x.g)>mg(b.g)?x:b),cl=gi.reduce((b,x)=>mg(x.g)<mg(b.g)||(mg(x.g)===mg(b.g)&&x.g.sa+x.g.sb>b.g.sa+b.g.sb)?x:b);
-  const gameWho=({g,i})=>{const aw=g.sa>g.sb;return `${names(aw?g.a:g.b)}<span class="ts"> beat ${names(aw?g.b:g.a)} · G${i+1}</span>`;};
+  const gameWho=({g,i})=>{if(g.sa===g.sb)return `${names(g.a)}<span class="ts"> drew with ${names(g.b)} · G${i+1}</span>`;const aw=g.sa>g.sb;return `${names(aw?g.a:g.b)}<span class="ts"> beat ${names(aw?g.b:g.a)} · G${i+1}</span>`;};
   const score=({g})=>`${Math.max(g.sa,g.sb)}–${Math.min(g.sa,g.sb)}`;
   const tiles=[
     ['Best share of points',Math.round(sc.v*100)+'%','won',who(sc.who)],
-    ['Best partnership',sgn(pr.pd/pr.G),'a game',`${names(pr.ids)}<span class="ts"> · ${pr.W}–${pr.G-pr.W} together</span>`],
+    ['Best partnership',sgn(pr.pd/pr.G),'a game',`${names(pr.ids)}<span class="ts"> · ${rec(pr.W,pr.D,pr.G)} together</span>`],
     ['Longest win streak',String(st.v),st.v===1?'win':'wins in a row',st.v>0?who(st.who):'Nobody yet'],
-    ['Most deuce wins',String(dk.v),dk.v===1?'game':'games',dk.v>0?who(dk.who):'No deuce games yet'],
+    deuceOn?['Most deuce wins',String(dk.v),dk.v===1?'game':'games',dk.v>0?who(dk.who):'No deuce games yet']:null,
     ['Biggest win',score(big),'',gameWho(big)],
     ['Closest game',score(cl),'',gameWho(cl)],
-  ];
+  ].filter(Boolean);
   const maxM=Math.max(1,...H.map(mg));
   const anyCr=H.some(g=>g.cr);
   pl.forEach(r=>{r.crs=r.crTeam?r.crt/r.crTeam:-1;});
-  const cols=[['id','Player'],['P','Played'],['wr','Win %'],['pw','Won %'],['pfg','Pts/G'],['pag','Agst/G'],['pdg','±/G'],['dw','Deuce']].concat(anyCr?[['crt','Credits'],['crs','Cr %']]:[]);
+  const cols=[['id','Player'],['P','Played'],['wr','Win %'],['pw','Won %'],['pfg','Pts/G'],['pag','Agst/G'],['pdg','±/G']].concat(deuceOn?[['dw','Deuce']]:[],anyCr?[['crt','Credits'],['crs','Cr %']]:[]);
   const {k,d}=statSort;
   const rows=[...pl].sort((x,y)=>{const a=x[k],b=y[k];const c=typeof a==='string'?a.localeCompare(b):a-b;return c*d||y.pdg-x.pdg||x.id.localeCompare(y.id);});
   if(!statPlayer||!S[statPlayer]||!S[statPlayer].P)statPlayer=[...pl].sort((x,y)=>y.pw-x.pw)[0].id;
   const me=S[statPlayer];
-  const partners=Object.values(pairs).filter(p=>p.ids.includes(me.id)).map(p=>({id:p.ids.find(x=>x!==me.id),G:p.G,W:p.W,pdg:p.pd/p.G}));
-  const opps=Object.entries(vs).filter(([key])=>key.split('>')[0]===me.id).map(([key,v])=>({id:key.split('>')[1],G:v.G,W:v.W,pdg:v.pd/v.G}));
+  const partners=Object.values(pairs).filter(p=>p.ids.includes(me.id)).map(p=>({id:p.ids.find(x=>x!==me.id),G:p.G,W:p.W,D:p.D,pdg:p.pd/p.G}));
+  const opps=Object.entries(vs).filter(([key])=>key.split('>')[0]===me.id).map(([key,v])=>({id:key.split('>')[1],G:v.G,W:v.W,D:v.D,pdg:v.pd/v.G}));
   const byPd=(x,y)=>y.pdg-x.pdg||y.G-x.G||x.id.localeCompare(y.id);
   partners.sort(byPd);opps.sort(byPd);
   const notYet=state.players.filter(p=>p.here&&p.id!==me.id&&!partners.some(q=>q.id===p.id)).map(p=>p.id);
-  const mini=(title,list)=>`<div><h3 class="sub">${title}</h3><div class="tablebox"><table class="stat"><thead><tr><th></th><th>Games</th><th>W–L</th><th>±/G</th></tr></thead><tbody>${list.map(r=>`<tr><td>${r.id}</td><td>${r.G}</td><td>${r.W}–${r.G-r.W}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td></tr>`).join('')}</tbody></table></div></div>`;
-  let line=`<b>${me.id}</b>: ${me.P} game${me.P>1?'s':''}, ${me.W}–${me.P-me.W}, ${me.pfg.toFixed(1)} points a game, ${Math.round(me.pw*100)}% of points won.`;
+  const mini=(title,list)=>`<div><h3 class="sub">${title}</h3><div class="tablebox"><table class="stat"><thead><tr><th></th><th>Games</th><th>${drawN?'W–D–L':'W–L'}</th><th>±/G</th></tr></thead><tbody>${list.map(r=>`<tr><td>${r.id}</td><td>${r.G}</td><td>${rec(r.W,r.D,r.G,drawN>0)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  let line=`<b>${me.id}</b>: ${me.P} game${me.P>1?'s':''}, ${rec(me.W,me.D,me.P)},${me.pfg.toFixed(1)} points a game, ${Math.round(me.pw*100)}% of points won.`;
   if(me.crt)line+=` Won ${me.crt} points personally, ${Math.round(me.crt/me.crTeam*100)}% of their side's points in games with credits.`;
   if(partners.length)line+=` Best with ${partners[0].id} (${sgn(partners[0].pdg)} a game).`;
   if(opps.length)line+=` Toughest opponent: ${opps[opps.length-1].id} (${sgn(opps[opps.length-1].pdg)} a game).`;
   if(notYet.length)line+=` Not partnered yet: ${notYet.join(', ')}.`;
   el.innerHTML=`
-  <p class="muted num">${n} game${n>1?'s':''} · average score ${avgW.toFixed(1)}–${avgL.toFixed(1)} · ${deuceN} went to 14–14</p>
+  <p class="muted num">${n} game${n>1?'s':''} · average score ${avgW.toFixed(1)}–${avgL.toFixed(1)}${deuceOn?` · ${deuceN} went to deuce`:''}${drawN?` · ${drawN} draw${drawN>1?'s':''}`:''}</p>
   <div class="tiles">${tiles.map(([l,v,u,w])=>`<div class="tile"><span class="tl">${l}</span><span class="tv">${v}${u?`<span class="tu">${u}</span>`:''}</span><span class="tw">${w}</span></div>`).join('')}</div>
   <h3 class="sub">Per player</h3>
   <div class="tablebox"><table class="stat"><thead><tr>${cols.map(([key,lab])=>`<th aria-sort="${k===key?(d>0?'ascending':'descending'):'none'}"><button class="sortb" data-act="sort" data-k="${key}">${lab}${k===key?(d>0?' ▲':' ▼'):''}</button></th>`).join('')}<th class="form">Form</th></tr></thead><tbody>
-  ${rows.map(r=>`<tr class="${r.id===statPlayer?'selrow':''}"><td><button class="pbtn" data-act="statp" data-id="${r.id}">${r.id}</button></td><td>${r.P}</td><td>${Math.round(r.wr*100)}%</td><td>${Math.round(r.pw*100)}%</td><td>${r.pfg.toFixed(1)}</td><td>${r.pag.toFixed(1)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td><td>${r.dW+r.dL?`${r.dW}–${r.dL}`:'–'}</td>${anyCr?`<td>${r.crG?r.crt:'–'}</td><td>${r.crTeam?Math.round(r.crs*100)+'%':'–'}</td>`:''}<td class="form">${spark(r.form,maxM)}</td></tr>`).join('')}
+  ${rows.map(r=>`<tr class="${r.id===statPlayer?'selrow':''}"><td><button class="pbtn" data-act="statp" data-id="${r.id}">${r.id}</button></td><td>${r.P}</td><td>${Math.round(r.wr*100)}%</td><td>${Math.round(r.pw*100)}%</td><td>${r.pfg.toFixed(1)}</td><td>${r.pag.toFixed(1)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td>${deuceOn?`<td>${r.dW+r.dL?`${r.dW}–${r.dL}`:'–'}</td>`:''}${anyCr?`<td>${r.crG?r.crt:'–'}</td><td>${r.crTeam?Math.round(r.crs*100)+'%':'–'}</td>`:''}<td class="form">${spark(r.form,maxM)}</td></tr>`).join('')}
   </tbody></table></div>
-  <p class="note">Tap a column to sort, or a name for their breakdown. Won % is the share of all points played that the player's side won. Deuce is the win–loss record in games that reached 14–14. ${anyCr?'Credits are points won by tapping the player\'s name; Cr % is their share of their side\'s points in those games. ':''}Form shows the margin of each game, oldest first: bars up for wins, down for losses.</p>
+  <p class="note">Tap a column to sort, or a name for their breakdown. Won % is the share of all points played that the player's side won.${drawN?' Win % counts a draw as half a win.':''}${deuceOn?' Deuce is the win–loss record in games that went to deuce.':''}${anyCr?'Credits are points won by tapping the player\'s name; Cr % is their share of their side\'s points in those games. ':''}Form shows the margin of each game, oldest first: bars up for wins, down for losses${drawN?', a flat mark for draws':''}.</p>
   <h3 class="sub">Breakdown</h3>
   <div class="pickrow">${state.players.filter(p=>S[p.id].P).map(p=>`<button class="chip ${p.id===me.id?'sel':''}" data-act="statp" data-id="${p.id}" aria-pressed="${p.id===me.id}">${p.id}</button>`).join('')}</div>
   <p class="muted">${line}</p>
@@ -724,13 +847,56 @@ function renderResults(){
   const h=state.history;
   if(!h.length){$('#results').innerHTML='<p class="muted">Finished games show up here.</p>';return;}
   $('#results').innerHTML=`<ol class="results">${h.map((g,i)=>({g,i})).reverse().map(({g,i})=>{
-    const aw=g.sa>g.sb;
-    return `<li><span class="gno">G${i+1}</span><span class="line"><span class="${aw?'w':'l'}">${pair(g.a)}</span><span class="sc">${g.sa}–${g.sb}</span><span class="${aw?'l':'w'}">${pair(g.b)}</span></span>${i===h.length-1?'<button class="btn ghost" data-act="undo">Undo game</button>':''}</li>`}).join('')}</ol>`;
+    const aw=g.sa>g.sb,dr=g.sa===g.sb;
+    return `<li><span class="gno">G${i+1}</span><span class="line"><span class="${dr?'':aw?'w':'l'}">${pair(g.a)}</span><span class="sc">${g.sa}–${g.sb}</span><span class="${dr?'':aw?'l':'w'}">${pair(g.b)}</span>${dr||g.timed?`<span class="ts"> · ${dr?'draw':'on time'}</span>`:''}</span>${i===h.length-1?'<button class="btn ghost" data-act="undo">Undo game</button>':''}</li>`}).join('')}</ol>`;
+}
+const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
+const stepHTML=(k,val,decDis,incDis,lab)=>`<div class="stepper"><button class="step" id="${k}-dec" data-act="rule" data-k="${k}" data-d="-1" aria-label="Lower ${lab}" ${decDis?'disabled':''}>−</button><output class="num">${val}</output><button class="step" id="${k}-inc" data-act="rule" data-k="${k}" data-d="1" aria-label="Raise ${lab}" ${incDis?'disabled':''}>+</button></div>`;
+const segHTML=(k,opts,cur,lab)=>`<div class="seg" role="group" aria-label="${lab}">${opts.map(([v,t])=>`<button id="${k}-${v}" data-act="ruleset" data-k="${k}" data-v="${v}" aria-pressed="${cur===v}">${t}</button>`).join('')}</div>`;
+function renderMode(){
+  const r=R(),pre=PRESETS.find(p=>Object.entries(p.r).every(([k,v])=>r[k]===v));
+  $('#mode').innerHTML=`
+  <div class="pickrow">${PRESETS.map(p=>`<button class="chip ${pre&&pre.id===p.id?'sel':''}" id="preset-${p.id}" data-act="preset" data-id="${p.id}" aria-pressed="${!!pre&&pre.id===p.id}">${p.label}</button>`).join('')}</div>
+  <p class="rulesum">${rulesSentence()}</p>
+  <div class="setrow"><b>Points to win</b>${stepHTML('target',r.target,r.target<=5,r.target>=30,'points to win')}</div>
+  <div class="setcol"><div><b>Deuce</b><p class="muted">${r.deuce==='none'?`The first side to ${r.target} wins.`:`From ${r.target-1}–${r.target-1}, a side must win by 2.`}</p></div>${segHTML('deuce',[['none','Off'],['cap','On, capped'],['nocap','On, no cap']],r.deuce,'Deuce')}</div>
+  ${r.deuce==='cap'?`<div class="setrow"><div><b>Cap</b><p class="muted num">${r.cap}–${r.cap-1} wins the game.</p></div>${stepHTML('cap',r.cap,r.cap<=r.target+1,r.cap>=r.target+15,'cap')}</div>`:''}
+  <div class="setrow"><div><b>Time limit per game</b><p class="muted">${r.limit?'Starts at the first point of each game.':'Off. Games play to the score.'}</p></div>${stepHTML('limit',r.limit?`${r.limit}<span class="unit">min</span>`:'Off',r.limit===0,r.limit>=30,'time limit')}</div>
+  ${r.limit?`<div class="setcol"><b>Level when time is up</b>${segHTML('timeUp',[['golden','Next point wins'],['draw','Draw']],r.timeUp,'Level when time is up')}</div>`:''}
+  <p class="note">Changes apply from the game on court. Finished games keep their scores.</p>`;
 }
 let resetArmed=false,resetT;
 function renderSession(){
-  const min=Math.max(1,state.history.length);
-  $('#session').innerHTML=`<div class="setrow"><div><b>Games tonight</b><p class="muted num">About ${Math.round(SESSION_MIN/state.target)} min each across 2 hours</p></div>
+  const r=R(),min=Math.max(1,state.history.length),nHere=state.players.filter(p=>p.here).length,G1=gamesToPairAll(nHere);
+  const pc=pace(),ppg=pointsPerGame(),gm=gameMinutes(),fullMin=ppg*pc.spp/60,capped=!!r.limit&&fullMin>r.limit;
+  const elapsed=state.clockStart?(Date.now()-state.clockStart)/60000:0;
+  const avail=Math.max(0,r.sessionMin-Math.max(elapsed,r.warmup));
+  const left=state.plan.length,fits=Math.floor(avail/gm),running=!!state.clockStart;
+  let status='',fixes=[];
+  if(left&&fits>=left){
+    const spare=avail-left*gm;
+    status=`<span class="status ok">Fits</span> with about ${fmtDur(spare)} to spare.`;
+    if(fits>left)fixes.push(`<button class="btn ghost small" data-act="settarget" data-n="${state.history.length+fits}">Fill the time: ${state.history.length+fits} games</button>`);
+  }else if(left){
+    status=`<span class="status short">Too long</span> About ${left-fits} game${left-fits>1?'s':''} more than the time allows.`;
+    const per=avail/left-CHANGEOVER_MIN,ratio=ppg/r.target,t=Math.floor(per*60/pc.spp/ratio);
+    if(t>=5&&t<r.target)fixes.push(`<button class="btn ghost small" data-act="suggest" data-k="target" data-v="${t}">Play to ${t}</button>`);
+    const L=Math.floor(per);
+    if(L>=3&&(!r.limit||L<r.limit))fixes.push(`<button class="btn ghost small" data-act="suggest" data-k="limit" data-v="${L}">${L}-min time limit</button>`);
+    if(fits>0)fixes.push(`<button class="btn ghost small" data-act="settarget" data-n="${state.history.length+fits}">Plan ${state.history.length+fits} games</button>`);
+  }
+  $('#session').innerHTML=`
+  <div class="planbox">
+    <div class="planrow"><span class="tl">Each game</span><span><b class="num">about ${Math.round(gm)} min</b><span class="muted"> · ${capped?`${r.limit}-min limit (a full game to ${r.target} takes about ${Math.round(fullMin)} min)`:`${Math.round(ppg)} points at ${Math.round(pc.spp)} s a point${pc.n?`, your pace over ${pc.n} games`:''}`}, plus ${CHANGEOVER_MIN} min to swap</span></span></div>
+    <div class="planrow"><span class="tl">Time</span><span><b class="num">${fmtDur(avail)}</b><span class="muted"> of games${running?' left':''} fits about ${fits}</span></span></div>
+    <div class="planrow"><span class="tl">Planned</span><span><b class="num">${left} game${left===1?'':'s'}${running||state.history.length?' left':''}</b><span class="muted"> · ${nHere} players need ${G1} for everyone to partner everyone once</span></span></div>
+    ${status?`<p class="planstatus">${status}</p>`:''}
+    ${fixes.length?`<div class="ractions">${fixes.join('')}</div>`:''}
+  </div>
+  <div class="setrow"><div><b>Session length</b><p class="muted">The whole booking, warm-up included.</p></div>${stepHTML('sessionMin',fmtDur(r.sessionMin),r.sessionMin<=30,r.sessionMin>=300,'session length')}</div>
+  <div class="setrow"><div><b>Warm-up</b><p class="muted">Time before the first scored game.</p></div>${stepHTML('warmup',r.warmup?`${r.warmup}<span class="unit">min</span>`:'None',r.warmup<=0,r.warmup>=Math.min(60,r.sessionMin-15),'warm-up')}</div>
+  <div class="setrow"><div><b>Rounds</b><p class="muted">How many times everyone partners everyone.</p></div>${stepHTML('rounds',r.rounds,r.rounds<=1,r.rounds>=4,'rounds')}</div>
+  <div class="setrow"><div><b>Games tonight</b><p class="muted">Set it yourself, or use the buttons above.</p></div>
     <div class="stepper"><button class="step" id="tdec" data-act="tdec" aria-label="One game fewer" ${state.target<=min?'disabled':''}>−</button><output class="num">${state.target}</output><button class="step" id="tinc" data-act="tinc" aria-label="One game more">+</button></div></div>
     <div class="setrow"><div><b>Move or back up this session</b><p class="muted">Copy it here, then paste it into the other page or phone.</p></div>
       <div class="ractions"><button class="btn ghost" id="exportbtn" data-act="export">Copy session</button><button class="btn ghost" id="importbtn" data-act="importopen" aria-expanded="${importing}">Paste a session</button></div></div>
@@ -739,23 +905,26 @@ function renderSession(){
       <textarea id="importtext" class="pin ta" rows="4" placeholder="Paste here"></textarea>
       ${importErr?`<p class="rerr" role="alert">${importErr}</p>`:''}
       <div class="ractions"><button type="submit" class="btn primary">Load session</button><button type="button" class="btn ghost" data-act="importcancel">Cancel</button></div></form>`:''}
-    <div class="setrow"><p class="muted">Clear all scores and start a new session. Player names are kept.</p><button class="btn danger" id="reset" data-act="reset">${resetArmed?'Tap again to clear':'Reset session'}</button></div>`;
+    <div class="setrow"><p class="muted">Clear all scores and start a new session. Players and game mode are kept.</p><button class="btn danger" id="reset" data-act="reset">${resetArmed?'Tap again to clear':'Reset session'}</button></div>`;
 }
 let importing=false,importErr='',exportText='';
-function sessionText(){return JSON.stringify({app:'thursday-doubles',v:2,players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0})),history:state.history,target:state.target});}
+function sessionText(){return JSON.stringify({app:'thursday-doubles',v:3,players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0})),history:state.history,target:state.target,rules:R()});}
 function importSession(txt){
   let d;try{d=JSON.parse(String(txt).trim());}catch(e){return 'That isn\'t a copied session. Use Copy session on the other page and paste again.';}
   if(!d||!Array.isArray(d.players)||!Array.isArray(d.history))return 'That isn\'t a copied session. Use Copy session on the other page and paste again.';
   const ids=d.players.map(p=>p&&p.id);
   if(ids.length<MIN_PLAYERS||ids.length>MAX_PLAYERS||ids.some(x=>typeof x!=='string'||!NAME_RE.test(x))||new Set(ids).size!==ids.length)return 'The player list in that session isn\'t valid.';
-  const okScore=x=>Number.isInteger(x)&&x>=0&&x<=30;
-  if(!d.history.every(g=>g&&Array.isArray(g.a)&&Array.isArray(g.b)&&g.a.length===2&&g.b.length===2&&new Set([...g.a,...g.b]).size===4&&[...g.a,...g.b].every(x=>ids.includes(x))&&okScore(g.sa)&&okScore(g.sb)&&g.sa!==g.sb))return 'Some games in that session aren\'t valid.';
+  const okScore=x=>Number.isInteger(x)&&x>=0&&x<=99;
+  if(!d.history.every(g=>g&&Array.isArray(g.a)&&Array.isArray(g.b)&&g.a.length===2&&g.b.length===2&&new Set([...g.a,...g.b]).size===4&&[...g.a,...g.b].every(x=>ids.includes(x))&&okScore(g.sa)&&okScore(g.sb)))return 'Some games in that session aren\'t valid.';
   const players=d.players.map(p=>({id:p.id,here:p.here!==false,offset:Math.max(0,+p.offset||0)}));
   const history=d.history.map(g=>{const o={a:g.a.slice(),b:g.b.slice(),sa:g.sa,sb:g.sb,t:+g.t||0};
+    if(Number.isInteger(g.to)&&g.to>=3&&g.to<=50)o.to=g.to;
+    if(g.dz===false)o.dz=false;
+    if(g.timed===true)o.timed=true;
     if(g.cr&&typeof g.cr==='object'){const c={};for(const k in g.cr)if(ids.includes(k)&&Number.isInteger(g.cr[k])&&g.cr[k]>0)c[k]=g.cr[k];if(Object.keys(c).length)o.cr=c;}return o;});
   if(players.filter(p=>p.here).length<MIN_PLAYERS)players.forEach(p=>p.here=true);
   const target=Math.max(history.length,Number.isInteger(d.target)?Math.min(d.target,60):history.length);
-  state={players,history,plan:[],cur:{sa:0,sb:0,log:[]},target,clockStart:null};
+  state={players,history,plan:[],cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:sanitizeRules(d.rules||(state&&state.rules))};
   state.plan=planGames(players,history,target-history.length);
   sel=null;swapMode=false;statPlayer=null;editing=false;
   return '';
@@ -800,19 +969,21 @@ document.addEventListener('click',e=>{
   if(act==='finish'){
     sel=null;
     const g=state.plan[0],{sa,sb}=state.cur;
-    if(!validScore(sa,sb)){toast(sa===sb?'Scores are level. Add the winning points first.':'Not a final score yet. First to 15 wins; from 14–14, win by 2, up to 20.');return;}
-    const cr=credits(state.cur.log);
-    state.history.push(Object.assign({a:g.a,b:g.b,sa,sb,t:Date.now()},Object.keys(cr).length?{cr}:{}));
+    if(!validScore(sa,sb)){toast(`Not a final score yet. ${rulesSentence()}`);return;}
+    const cr=credits(state.cur.log),r=R(),timed=!regularWin(sa,sb);
+    state.history.push(Object.assign({a:g.a,b:g.b,sa,sb,t:Date.now(),to:r.target},r.deuce==='none'?{dz:false}:{},timed?{timed:true}:{},Object.keys(cr).length?{cr}:{}));
     swapMode=false;
     state.plan.shift();state.cur={sa:0,sb:0,log:[]};save();render();
-    toast(`Game ${state.history.length} saved. ${sa>sb?g.a.join(' & '):g.b.join(' & ')} win ${Math.max(sa,sb)}–${Math.min(sa,sb)}.`);
+    toast(sa===sb?`Game ${state.history.length} saved. A draw at ${sa}–${sb}.`:`Game ${state.history.length} saved. ${sa>sb?g.a.join(' & '):g.b.join(' & ')} win ${Math.max(sa,sb)}–${Math.min(sa,sb)}${timed?' on time':''}.`);
     window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     return;
   }
   if(act==='undo'){
     const g=state.history.pop();state.plan.unshift({a:g.a,b:g.b});
     const log=[];for(const s of ['a','b']){let n=g['s'+s];for(const id of g[s]){const c=(g.cr&&g.cr[id])||0;for(let i=0;i<c;i++){log.push({s,by:id});n--;}}for(let i=0;i<n;i++)log.push({s,by:null});}
-    state.cur={sa:g.sa,sb:g.sb,log};save();render();toast(`Game ${state.history.length+1} is back on court with its score.`);return;
+    state.cur={sa:g.sa,sb:g.sb,log};
+    if(g.timed&&R().limit)state.cur.start=Date.now()-R().limit*60000;
+    save();render();toast(`Game ${state.history.length+1} is back on court with its score.`);return;
   }
   if(act==='toggle'){
     const p=state.players.find(x=>x.id===b.dataset.id);
@@ -832,10 +1003,35 @@ document.addEventListener('click',e=>{
   if(act==='settarget'){state.target=+b.dataset.n;replan(`Planned ${state.target} games.`);return;}
   if(act==='tinc'){state.target++;replan(`${state.target} games tonight.`);return;}
   if(act==='tdec'){state.target=Math.max(state.history.length,state.target-1);replan(`${state.target} games tonight.`);return;}
-  if(act==='clock'){state.clockStart=Date.now();save();renderClock();return;}
+  if(act==='clock'){state.clockStart=Date.now();save();renderClock();renderSession();return;}
+  if(act==='rule'){
+    const r=R(),k=b.dataset.k,d=+b.dataset.d;
+    if(k==='target'){const off=Math.max(1,r.cap-r.target);r.target=clamp(r.target+d,5,30);r.cap=Math.min(99,r.target+off);}
+    if(k==='cap')r.cap=clamp(r.cap+d,r.target+1,r.target+15);
+    if(k==='limit')r.limit=r.limit===0?(d>0?5:0):(d<0&&r.limit<=5?0:clamp(r.limit+d,5,30));
+    if(k==='sessionMin'){r.sessionMin=clamp(r.sessionMin+15*d,30,300);r.warmup=Math.min(r.warmup,r.sessionMin-15);}
+    if(k==='warmup')r.warmup=clamp(r.warmup+5*d,0,Math.min(60,r.sessionMin-15));
+    if(k==='rounds'){
+      r.rounds=clamp(r.rounds+d,1,4);
+      state.target=Math.max(state.history.length+(state.plan.length?1:0),r.rounds*gamesToPairAll(state.players.filter(p=>p.here).length));
+      replan(`${r.rounds} round${r.rounds>1?'s':''}: ${state.target} games.`);return;
+    }
+    save();render();return;
+  }
+  if(act==='ruleset'){const r=R();r[b.dataset.k]=b.dataset.v;save();render();return;}
+  if(act==='preset'){
+    const p=PRESETS.find(x=>x.id===b.dataset.id);if(!p)return;
+    Object.assign(R(),p.r);save();render();toast(`${p.label}: ${rulesLine()}.`);return;
+  }
+  if(act==='suggest'){
+    const r=R(),k=b.dataset.k,v=+b.dataset.v;
+    if(k==='target'){const off=Math.max(1,r.cap-r.target);r.target=clamp(v,5,30);r.cap=Math.min(99,r.target+off);toast(`Games are now to ${r.target}.`);}
+    if(k==='limit'){r.limit=clamp(v,3,30);toast(`Games now stop after ${r.limit} minutes.`);}
+    save();render();return;
+  }
   if(act==='reset'){
     if(!resetArmed){resetArmed=true;renderSession();clearTimeout(resetT);resetT=setTimeout(()=>{resetArmed=false;renderSession();},3500);return;}
-    resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>p.id));save();render();toast('New session started. Player names are kept.');return;
+    resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>p.id),state.rules);save();render();toast('New session started. Players and game mode are kept.');return;
   }
 });
 document.addEventListener('submit',e=>{
@@ -848,7 +1044,13 @@ document.addEventListener('submit',e=>{
     window.scrollTo({top:0});
   }
 });
-setInterval(()=>{if(state)renderClock();},20000);
+setInterval(()=>{if(!state)return;renderClock();if(state.clockStart&&!importing&&!exportText&&!resetArmed)renderSession();},20000);
+// per-game countdown: update the line every second, redraw the court once when time runs out
+setInterval(()=>{
+  if(!state||!R().limit||!state.plan[0])return;
+  const t=$('#gtimer');if(t)t.innerHTML=gameTimerText();
+  if(timeIsUp()!==courtTimeUp)renderCourt();
+},1000);
 
 // keep the screen awake while scoring, where the browser allows it
 let wake=null;
