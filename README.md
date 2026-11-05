@@ -1,4 +1,4 @@
-# Thursday Doubles
+# Badminton Doubles
 
 A badminton doubles scorekeeper for 4 to 8 players sharing one court. It plans who plays with whom so that everyone partners everyone, keeps score from one phone, and turns the night's results into standings, stats and a fun title for each player.
 
@@ -19,10 +19,10 @@ It is a single HTML file with no backend, account or install. Open it in a phone
 |---|---|
 | **Play** | The court, the score, the game timer and who's up next. Nothing else, so you never scroll while scoring. |
 | **Results** | Standings, characters and highlights, with per-player stats, partners and every game folded away underneath. |
-| **Setup** | Players, game mode, the session planner, backup and reset. A new session starts here and ends with **Start playing**. |
+| **Setup** | Players, game mode, the session planner, export and import, and reset. A new session starts here and ends with **Start playing**. |
 | **About** | What the app is, how to use it, and what the numbers and characters mean. |
 
-The rules line under the title is a shortcut to Setup.
+The top of every tab shows the day and date of the session, taken from when you start playing, and the rules line under the title is a shortcut to Setup.
 
 ## What it does
 
@@ -39,7 +39,7 @@ The rules line under the title is a shortcut to Setup.
 - **Results list** with undo for the last game.
 - **Copy for group chat.** Copies the standings and characters as text, ready to paste.
 - **Session clock** for your booking, with a warm-up countdown and the time left per remaining game.
-- **Copy and paste a session** to back it up or move it to another phone.
+- **Export and import.** Save a session as a `.json` file to keep it or open it on another phone, or copy and paste it as text.
 - Works offline once it has been opened online, and follows the phone's light or dark mode.
 
 ## Game modes
@@ -126,7 +126,8 @@ Scores are saved in the phone's browser storage (`localStorage`). Nothing is sen
 
 - Each phone and browser has its own copy.
 - Clearing browser data, or using a private window, loses it.
-- To keep a night's results, use **Setup → Copy session** and paste the text somewhere safe. **Paste a session** loads it back.
+- To keep a night's results, use **Setup → Export to file**. It saves a file such as `doubles-2026-11-05.json`. **Import from file** loads it back on any phone, after asking before it replaces what's there.
+- **Copy as text** and **Paste text** do the same through the clipboard, which is handy between two web pages.
 
 ## Hosting on GitHub Pages
 

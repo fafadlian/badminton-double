@@ -13,7 +13,7 @@
 <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
-<title>Thursday Doubles</title>
+<title>Badminton Doubles</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
@@ -59,6 +59,11 @@ section{display:flex;flex-direction:column;gap:12px}
 
 header{display:flex;flex-direction:column;gap:6px}
 .toprow{display:flex;align-items:center;justify-content:space-between;gap:8px 12px;flex-wrap:wrap}
+.titlebox{display:flex;flex-direction:column;gap:2px;min-width:0}
+.dateline{font-weight:600;color:var(--muted);font-size:.95rem}
+.vh{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none}
+.vh:focus-visible+label{outline:3px solid var(--accent);outline-offset:2px}
+label.btn{cursor:pointer}
 .h2row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .eyebrow{font-family:var(--font-display);font-weight:600;text-transform:uppercase;letter-spacing:.1em;font-size:.9rem;color:var(--accent)}
 .hrow{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;color:var(--muted)}
@@ -283,7 +288,7 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
 <body>
 <div class="wrap">
   <header>
-    <div class="toprow"><h1>Thursday Doubles</h1><span id="clock"></span></div>
+    <div class="toprow"><div class="titlebox"><span class="dateline" id="dateline"></span><h1>Badminton Doubles</h1></div><span id="clock"></span></div>
     <a class="eyebrow" id="ruleline" href="#setup">1 court · first to 15</a>
     <span id="meta" class="muted num"></span>
   </header>
@@ -332,6 +337,10 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
     <section aria-labelledby="h-session">
       <h2 id="h-session">Session</h2>
       <div id="session" class="rosterwrap"></div>
+    </section>
+    <section aria-labelledby="h-backup">
+      <h2 id="h-backup">Export and import</h2>
+      <div id="backup" class="rosterwrap"></div>
     </section>
   </div>
 
@@ -526,6 +535,15 @@ function gameMinutes(r=R()){
   if(r.limit)m=Math.min(m,r.limit);
   return m+CHANGEOVER_MIN;
 }
+// the session's day: the date it was played, or today before the first game
+const ymd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+function sessionDay(){
+  if(state.date){const [y,m,d]=state.date.split('-').map(Number);return new Date(y,m-1,d);}
+  const t=(state.history.find(g=>g.t>0)||{}).t||state.clockStart;
+  return t?new Date(t):new Date();
+}
+const dayLabel=()=>sessionDay().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+function stampDate(){if(!state.date)state.date=ymd(sessionDay());}
 const fmtDur=m=>{m=Math.round(m);const h=Math.floor(m/60),mm=m%60;return h?`${h}h${mm?` ${mm}m`:''}`:`${mm} min`;};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 function load(){try{const r=localStorage.getItem(KEY);return r?JSON.parse(r):null}catch(e){return null}}
@@ -572,8 +590,9 @@ const modeLocked=()=>!!state.plan[0]&&(state.cur.sa+state.cur.sb)>0;
 function render(){
   const played=state.history.length,total=played+state.plan.length;
   $('#meta').textContent=state.plan.length?`Game ${played+1} of ${total}`:`${played} games played`;
+  $('#dateline').textContent=dayLabel();
   const r=R();$('#ruleline').textContent=`1 court · first to ${r.target}${r.deuce==='cap'?` · deuce to ${r.cap}`:r.deuce==='nocap'?' · deuce, no cap':''}${r.limit?` · ${r.limit} min`:''}`;
-  renderMode();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();renderAbout();renderShare();
+  renderMode();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();renderBackup();renderAbout();renderShare();
 }
 function renderClock(){
   const el=$('#clock');
@@ -941,7 +960,7 @@ function renderAbout(){
   const n=state.players.filter(p=>p.here).length,G=gamesToPairAll(n);
   $('#aboutbody').innerHTML=`
   <section><h2>What this is</h2>
-    <p class="lead-in">Thursday Doubles plans and scores a night of badminton doubles for 4 to 8 people sharing one court.</p>
+    <p class="lead-in">Badminton Doubles plans and scores a night of badminton doubles for 4 to 8 people sharing one court.</p>
     <p>It picks the pairs so everyone partners everyone, keeps score on one phone, and sums up the night with standings, stats and a title for each player.</p></section>
   <section><h2>How to use it</h2>
     <ol>
@@ -975,9 +994,8 @@ function shareText(){
   const {S}=computeStats();
   const pl=Object.values(S).filter(r=>r.P);pl.forEach(r=>{r.wr=winRate(r);r.pw=r.pf/(r.pf+r.pa||1);r.pd=(r.pf-r.pa)/r.P;});
   pl.sort((x,y)=>y.wr-x.wr||y.pw-x.pw||y.pd-x.pd||x.id.localeCompare(y.id));
-  const when=new Date(H[0].t||Date.now()).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
   const chars=archetypes();
-  const lines=[`Thursday Doubles, ${when}`,`${H.length} game${H.length>1?'s':''} · ${rulesLine()}`,'','Standings'];
+  const lines=[`Badminton Doubles · ${dayLabel()}`,`${H.length} game${H.length>1?'s':''} · ${rulesLine()}`,'','Standings'];
   pl.forEach((r,i)=>lines.push(`${i+1}. ${r.id}  ${rec(r.W,r.D,r.P)}  (${Math.round(r.pw*100)}% of points)`));
   if(chars.length){lines.push('','Characters');chars.forEach(c=>lines.push(`${c.id}: ${c.title}`));}
   return lines.join('\n');
@@ -1021,24 +1039,25 @@ function renderSession(){
   <div class="setrow"><div><b>Games tonight</b><p class="muted">Set it yourself, or use the buttons above.</p></div>
     <div class="stepper"><button class="step" id="tdec" data-act="tdec" aria-label="One game fewer" ${state.target<=min?'disabled':''}>−</button><output class="num">${state.target}</output><button class="step" id="tinc" data-act="tinc" aria-label="One game more">+</button></div></div>
   ${!state.started&&!state.history.length?`<div class="startcard"><p><b>Ready?</b> ${nHere} players, ${state.target} games. ${rulesSentence()}</p><button class="btn primary full" id="startplay" data-act="startplay">Start playing</button></div>`:''}
-    <div class="setrow"><div><b>Move or back up this session</b><p class="muted">Copy it here, then paste it into the other page or phone.</p></div>
-      <div class="ractions"><button class="btn ghost" id="exportbtn" data-act="export">Copy session</button><button class="btn ghost" id="importbtn" data-act="importopen" aria-expanded="${importing}">Paste a session</button></div></div>
-    ${exportText?`<div class="redit"><label class="muted" for="exporttext">Copying was blocked here. Select all of this text and copy it yourself:</label><textarea id="exporttext" class="pin ta" rows="4" readonly>${exportText}</textarea></div>`:''}
-    ${importing?`<form id="importform" class="redit" novalidate><label class="muted" for="importtext">Paste the copied session. Loading it replaces the session on this phone.</label>
-      <textarea id="importtext" class="pin ta" rows="4" placeholder="Paste here"></textarea>
-      ${importErr?`<p class="rerr" role="alert">${importErr}</p>`:''}
-      <div class="ractions"><button type="submit" class="btn primary">Load session</button><button type="button" class="btn ghost" data-act="importcancel">Cancel</button></div></form>`:''}
     <div class="setrow"><p class="muted">Clear all scores and start a new session. Players and game mode are kept.</p><button class="btn danger" id="reset" data-act="reset">${resetArmed?'Tap again to clear':'Reset session'}</button></div>`;
 }
-let importing=false,importErr='',exportText='';
-function sessionText(){return JSON.stringify({app:'thursday-doubles',v:3,players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0})),history:state.history,target:state.target,rules:R()});}
-function importSession(txt){
-  let d;try{d=JSON.parse(String(txt).trim());}catch(e){return 'That isn\'t a copied session. Use Copy session on the other page and paste again.';}
-  if(!d||!Array.isArray(d.players)||!Array.isArray(d.history))return 'That isn\'t a copied session. Use Copy session on the other page and paste again.';
+let importing=false,importErr='',exportText='',exportNote='',pendingImport=null;
+function sessionData(){return {app:'thursday-doubles',v:4,date:state.date||ymd(sessionDay()),players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0})),history:state.history,target:state.target,rules:R()};}
+function sessionText(){return JSON.stringify(sessionData());}
+// check a saved session; returns {err} or {d} without touching the current one
+function parseSession(txt){
+  const bad={err:'That isn\'t a saved session. Export it again from the other page or phone and try once more.'};
+  let d;try{d=JSON.parse(String(txt).trim());}catch(e){return bad;}
+  if(!d||!Array.isArray(d.players)||!Array.isArray(d.history))return bad;
   const ids=d.players.map(p=>p&&p.id);
-  if(ids.length<MIN_PLAYERS||ids.length>MAX_PLAYERS||ids.some(x=>typeof x!=='string'||!NAME_RE.test(x))||new Set(ids).size!==ids.length)return 'The player list in that session isn\'t valid.';
+  if(ids.length<MIN_PLAYERS||ids.length>MAX_PLAYERS||ids.some(x=>typeof x!=='string'||!NAME_RE.test(x))||new Set(ids).size!==ids.length)return {err:'The player list in that session isn\'t valid.'};
   const okScore=x=>Number.isInteger(x)&&x>=0&&x<=99;
-  if(!d.history.every(g=>g&&Array.isArray(g.a)&&Array.isArray(g.b)&&g.a.length===2&&g.b.length===2&&new Set([...g.a,...g.b]).size===4&&[...g.a,...g.b].every(x=>ids.includes(x))&&okScore(g.sa)&&okScore(g.sb)))return 'Some games in that session aren\'t valid.';
+  if(!d.history.every(g=>g&&Array.isArray(g.a)&&Array.isArray(g.b)&&g.a.length===2&&g.b.length===2&&new Set([...g.a,...g.b]).size===4&&[...g.a,...g.b].every(x=>ids.includes(x))&&okScore(g.sa)&&okScore(g.sb)))return {err:'Some games in that session aren\'t valid.'};
+  return {d};
+}
+function importSession(txt){const r=parseSession(txt);if(r.err)return r.err;applySession(r.d);return '';}
+function applySession(d){
+  const ids=d.players.map(p=>p.id);
   const players=d.players.map(p=>({id:p.id,here:p.here!==false,offset:Math.max(0,+p.offset||0)}));
   const history=d.history.map(g=>{const o={a:g.a.slice(),b:g.b.slice(),sa:g.sa,sb:g.sb,t:+g.t||0};
     if(Number.isInteger(g.to)&&g.to>=3&&g.to<=50)o.to=g.to;
@@ -1047,10 +1066,52 @@ function importSession(txt){
     if(g.cr&&typeof g.cr==='object'){const c={};for(const k in g.cr)if(ids.includes(k)&&Number.isInteger(g.cr[k])&&g.cr[k]>0)c[k]=g.cr[k];if(Object.keys(c).length)o.cr=c;}return o;});
   if(players.filter(p=>p.here).length<MIN_PLAYERS)players.forEach(p=>p.here=true);
   const target=Math.max(history.length,Number.isInteger(d.target)?Math.min(d.target,60):history.length);
-  state={players,history,plan:[],cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:sanitizeRules(d.rules||(state&&state.rules))};
+  const firstT=history.find(g=>g.t>0);
+  const date=typeof d.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.date)?d.date:firstT?ymd(new Date(firstT.t)):undefined;
+  state={players,history,plan:[],cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:sanitizeRules(d.rules||(state&&state.rules)),date,started:history.length>0};
   state.plan=planGames(players,history,target-history.length);
   sel=null;swapMode=false;statPlayer=null;editing=false;
-  return '';
+}
+// ---------- export and import ----------
+function renderBackup(){
+  const n=state.history.length,p=pendingImport;
+  $('#backup').innerHTML=`
+  <p class="muted">Export saves this session as a file you can keep or open on another phone. ${n?`It has ${n} game${n>1?'s':''} from ${dayLabel()}.`:'There are no finished games yet.'}</p>
+  <div class="ractions">
+    <button class="btn ghost" id="exportfile" data-act="exportfile">Export to file</button>
+    <input type="file" id="importfile" class="vh" accept=".json,.txt,application/json,text/plain">
+    <label class="btn ghost" for="importfile">Import from file</label>
+  </div>
+  ${p?`<div class="startcard" role="alert"><p><b>Load ${esc(p.name)}?</b> ${p.d.history.length} game${p.d.history.length===1?'':'s'}, ${p.d.players.length} players${p.when?`, ${p.when}`:''}. This replaces the session on this phone${n?`, including its ${n} game${n>1?'s':''}`:''}.</p>
+    <div class="ractions"><button class="btn primary" id="importconfirm" data-act="importconfirm">Load session</button><button class="btn ghost" data-act="importdrop">Cancel</button></div></div>`:''}
+  ${importErr&&!importing?`<p class="rerr" role="alert">${importErr}</p>`:''}
+  ${exportNote?`<p class="muted">${exportNote}</p>`:''}
+  <div class="ractions"><button class="btn ghost small" id="exportbtn" data-act="export">Copy as text</button><button class="btn ghost small" id="importbtn" data-act="importopen" aria-expanded="${importing}">Paste text</button></div>
+  ${exportText?`<div class="redit"><label class="muted" for="exporttext">Select all of this text and copy it yourself:</label><textarea id="exporttext" class="pin ta" rows="4" readonly>${esc(exportText)}</textarea></div>`:''}
+  ${importing?`<form id="importform" class="redit" novalidate><label class="muted" for="importtext">Paste a copied session. Loading it replaces the session on this phone.</label>
+    <textarea id="importtext" class="pin ta" rows="4" placeholder="Paste here"></textarea>
+    ${importErr?`<p class="rerr" role="alert">${importErr}</p>`:''}
+    <div class="ractions"><button type="submit" class="btn primary">Load session</button><button type="button" class="btn ghost" data-act="importcancel">Cancel</button></div></form>`:''}`;
+}
+const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// save a file: the Claude viewer's save prompt, or a normal browser download on the website
+async function saveFile(name,text){
+  const c=typeof window!=='undefined'?window.claude:null;
+  if(c&&typeof c.use==='function'){
+    let dl=null;try{dl=await c.use('downloads');}catch(e){}
+    if(!dl)return 'unavailable';
+    try{await dl.save({filename:name,data:text});return 'saved';}catch(e){return e&&e.code==='declined'?'declined':'unavailable';}
+  }
+  try{
+    const url=URL.createObjectURL(new Blob([text],{type:'application/json'}));
+    const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),4000);return 'saved';
+  }catch(e){return 'unavailable';}
+}
+function loadPending(){
+  const p=pendingImport;if(!p)return;pendingImport=null;importErr='';
+  applySession(p.d);save();render();goTab(state.plan.length?'play':'results');
+  toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
 }
 
 // ---------- actions ----------
@@ -1076,13 +1137,24 @@ document.addEventListener('click',e=>{
     return;
   }
   if(act==='export'){
-    const txt=sessionText();exportText='';
-    const fallback=()=>{exportText=txt;renderSession();const t=$('#exporttext');if(t&&t.select){t.focus();t.select();}};
-    try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>{renderSession();toast('Session copied. Paste it into the other page.');}).catch(fallback);}else fallback();}catch(err){fallback();}
+    const txt=sessionText();exportText='';exportNote='';
+    const fallback=()=>{exportText=txt;renderBackup();const t=$('#exporttext');if(t&&t.select){t.focus();t.select();}};
+    try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(txt).then(()=>{renderBackup();toast('Session copied as text. Paste it on the other page or phone.');}).catch(fallback);}else fallback();}catch(err){fallback();}
     return;
   }
-  if(act==='importopen'){importing=!importing;importErr='';exportText='';renderSession();return;}
-  if(act==='importcancel'){importing=false;importErr='';renderSession();return;}
+  if(act==='exportfile'){
+    const name=`doubles-${state.date||ymd(sessionDay())}.json`,txt=JSON.stringify(sessionData(),null,2);
+    exportText='';exportNote='';
+    saveFile(name,txt).then(res=>{
+      if(res==='saved')toast(`Exported ${name}.`);
+      else if(res==='unavailable'){exportNote="Saving a file isn't available here, so copy the session as text below instead.";exportText=sessionText();renderBackup();}
+    });
+    return;
+  }
+  if(act==='importconfirm'){loadPending();return;}
+  if(act==='importdrop'){pendingImport=null;importErr='';renderBackup();return;}
+  if(act==='importopen'){importing=!importing;importErr='';exportText='';exportNote='';renderBackup();return;}
+  if(act==='importcancel'){importing=false;importErr='';renderBackup();return;}
   if(act==='edit'){editing=true;editErr='';editDraft=state.players.map(p=>({orig:p.id,name:p.id,rm:false}));renderRoster();return;}
   if(act==='canceledit'){editing=false;editDraft=null;editErr='';renderRoster();return;}
   if(act==='rm'){const i=+b.dataset.i;editDraft.forEach((r,j)=>{const inp=$('#pn-'+j);if(inp&&!r.rm)r.name=inp.value;});editDraft[i].rm=!editDraft[i].rm;renderRoster();return;}
@@ -1098,7 +1170,7 @@ document.addEventListener('click',e=>{
     if(!(state.cur.sa+state.cur.sb))renderMode();
     toast(`Last point undone${e.by?` (${e.by})`:''}.`);return;
   }
-  if(act==='startplay'){state.started=true;save();goTab('play');return;}
+  if(act==='startplay'){state.started=true;stampDate();save();render();goTab('play');return;}
   if(act==='gotab'){goTab(b.dataset.t);return;}
   if(act==='share'){
     const txt=shareText();if(!txt)return;shareFallback='';
@@ -1114,7 +1186,7 @@ document.addEventListener('click',e=>{
     state.history.push(Object.assign({a:g.a,b:g.b,sa,sb,t:Date.now(),to:r.target},r.deuce==='none'?{dz:false}:{},timed?{timed:true}:{},Object.keys(cr).length?{cr}:{}));
     swapMode=false;
     state.plan.shift();state.cur={sa:0,sb:0,log:[]};save();render();
-    state.started=true;
+    state.started=true;stampDate();save();
     toast(sa===sb?`Game ${state.history.length} saved. A draw at ${sa}–${sb}.`:`Game ${state.history.length} saved. ${sa>sb?g.a.join(' & '):g.b.join(' & ')} win ${Math.max(sa,sb)}–${Math.min(sa,sb)}${timed?' on time':''}.`,{label:'Undo',act:'undo'});
     window.scrollTo({top:0,behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     return;
@@ -1145,7 +1217,7 @@ document.addEventListener('click',e=>{
   if(act==='settarget'){state.target=+b.dataset.n;replan(`Planned ${state.target} games.`);return;}
   if(act==='tinc'){state.target++;replan(`${state.target} games tonight.`);return;}
   if(act==='tdec'){state.target=Math.max(state.history.length,state.target-1);replan(`${state.target} games tonight.`);return;}
-  if(act==='clock'){state.clockStart=Date.now();save();renderClock();renderSession();return;}
+  if(act==='clock'){state.clockStart=Date.now();stampDate();save();renderClock();renderSession();return;}
   if(act==='rule'){
     const r=R(),k=b.dataset.k,d=+b.dataset.d;
     if(['target','cap','limit'].includes(k)&&modeLocked()){toast('Finish the game on court before changing the game mode.');return;}
@@ -1180,16 +1252,29 @@ document.addEventListener('click',e=>{
   }
 });
 document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('.tabbar a');if(a&&a.getAttribute&&typeof location!=='undefined'&&a.getAttribute('href')===location.hash){e.preventDefault();window.scrollTo({top:0,behavior:'smooth'});}});
+document.addEventListener('change',e=>{
+  const inp=e.target;if(!inp||inp.id!=='importfile'||!inp.files||!inp.files[0])return;
+  const f=inp.files[0];importErr='';pendingImport=null;
+  if(f.size>2*1024*1024){importErr='That file is too big to be a saved session.';renderBackup();return;}
+  f.text().then(txt=>{
+    const r=parseSession(txt);
+    if(r.err){importErr=r.err;renderBackup();return;}
+    const firstT=r.d.history.find(g=>+g.t>0);
+    const dt=typeof r.d.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.d.date)?(()=>{const [y,m,d]=r.d.date.split('-').map(Number);return new Date(y,m-1,d);})():firstT?new Date(firstT.t):null;
+    pendingImport={d:r.d,name:f.name,when:dt?dt.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):''};
+    importing=false;renderBackup();
+  }).catch(()=>{importErr="That file couldn't be read. Try exporting it again.";renderBackup();});
+});
 document.addEventListener('submit',e=>{
   if(e.target.id==='rosterform'){e.preventDefault();saveRoster();}
   if(e.target.id==='importform'){
     e.preventDefault();
     const err=importSession(($('#importtext')||{}).value||'');
-    if(err){importErr=err;renderSession();return;}
-    importing=false;importErr='';state.started=state.history.length>0;save();render();goTab(state.plan.length?'play':'results');toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
+    if(err){importErr=err;renderBackup();return;}
+    importing=false;importErr='';save();render();goTab(state.plan.length?'play':'results');toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
   }
 });
-setInterval(()=>{if(!state)return;renderClock();if(state.clockStart&&!importing&&!exportText&&!resetArmed)renderSession();},20000);
+setInterval(()=>{if(!state)return;renderClock();if(state.clockStart&&!resetArmed)renderSession();},20000);
 // per-game countdown: update the line every second, redraw the court once when time runs out
 setInterval(()=>{
   if(!state||!R().limit||!state.plan[0])return;

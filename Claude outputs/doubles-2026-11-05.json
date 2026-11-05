@@ -1,0 +1,198 @@
+{
+  "app": "thursday-doubles",
+  "v": 4,
+  "date": "2026-11-05",
+  "players": [
+    {
+      "id": "Fat",
+      "here": true,
+      "offset": 0
+    },
+    {
+      "id": "Mire",
+      "here": true,
+      "offset": 0
+    },
+    {
+      "id": "Git",
+      "here": true,
+      "offset": 0
+    },
+    {
+      "id": "Ses",
+      "here": true,
+      "offset": 0
+    },
+    {
+      "id": "Don",
+      "here": true,
+      "offset": 0
+    },
+    {
+      "id": "Mand",
+      "here": true,
+      "offset": 0
+    },
+    {
+      "id": "Audi",
+      "here": true,
+      "offset": 0
+    }
+  ],
+  "history": [
+    {
+      "a": [
+        "Git",
+        "Ses"
+      ],
+      "b": [
+        "Don",
+        "Mand"
+      ],
+      "sa": 13,
+      "sb": 15,
+      "to": 15
+    },
+    {
+      "a": [
+        "Fat",
+        "Mand"
+      ],
+      "b": [
+        "Mire",
+        "Audi"
+      ],
+      "sa": 15,
+      "sb": 12,
+      "to": 15
+    },
+    {
+      "a": [
+        "Fat",
+        "Git"
+      ],
+      "b": [
+        "Ses",
+        "Don"
+      ],
+      "sa": 15,
+      "sb": 11,
+      "to": 15
+    },
+    {
+      "a": [
+        "Mire",
+        "Don"
+      ],
+      "b": [
+        "Mand",
+        "Audi"
+      ],
+      "sa": 15,
+      "sb": 13,
+      "to": 15
+    },
+    {
+      "a": [
+        "Fat",
+        "Ses"
+      ],
+      "b": [
+        "Mire",
+        "Git"
+      ],
+      "sa": 15,
+      "sb": 6,
+      "to": 15
+    },
+    {
+      "a": [
+        "Ses",
+        "Mand"
+      ],
+      "b": [
+        "Don",
+        "Audi"
+      ],
+      "sa": 15,
+      "sb": 10,
+      "to": 15
+    },
+    {
+      "a": [
+        "Fat",
+        "Mire"
+      ],
+      "b": [
+        "Git",
+        "Audi"
+      ],
+      "sa": 15,
+      "sb": 9,
+      "to": 15
+    },
+    {
+      "a": [
+        "Mire",
+        "Mand"
+      ],
+      "b": [
+        "Ses",
+        "Don"
+      ],
+      "sa": 13,
+      "sb": 15,
+      "to": 15
+    },
+    {
+      "a": [
+        "Fat",
+        "Audi"
+      ],
+      "b": [
+        "Git",
+        "Don"
+      ],
+      "sa": 17,
+      "sb": 19,
+      "to": 15
+    },
+    {
+      "a": [
+        "Mire",
+        "Ses"
+      ],
+      "b": [
+        "Git",
+        "Mand"
+      ],
+      "sa": 18,
+      "sb": 16,
+      "to": 15
+    },
+    {
+      "a": [
+        "Fat",
+        "Don"
+      ],
+      "b": [
+        "Ses",
+        "Audi"
+      ],
+      "sa": 15,
+      "sb": 6,
+      "to": 15
+    }
+  ],
+  "target": 11,
+  "rules": {
+    "target": 15,
+    "deuce": "cap",
+    "cap": 20,
+    "limit": 0,
+    "timeUp": "golden",
+    "sessionMin": 120,
+    "warmup": 30,
+    "rounds": 1
+  }
+}
