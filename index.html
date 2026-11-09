@@ -131,6 +131,7 @@ button.chip{min-height:36px;padding:4px 14px}
 .tablebox{overflow-x:auto}
 table{border-collapse:collapse;width:100%}
 .stand th,.stand td{padding:8px 6px;text-align:right;font-variant-numeric:tabular-nums;border-bottom:1px solid var(--line)}
+th abbr{text-decoration:none;cursor:help}
 .stand th{font-family:var(--font-display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:.85rem;color:var(--muted)}
 .stand th:nth-child(2),.stand td:nth-child(2){text-align:left}
 .stand td:first-child,.stand th:first-child{text-align:left;width:2rem;color:var(--muted)}
@@ -183,6 +184,13 @@ table{border-collapse:collapse;width:100%}
 .half .nm .cr{font-family:var(--font-body);font-size:.72rem;font-weight:600;margin-left:6px;padding:1px 7px;border-radius:999px;background:var(--court-line);color:var(--court);letter-spacing:0}
 .half button.nm:active{background:var(--court-line);color:var(--court)}
 .rosterwrap{display:flex;flex-direction:column;gap:12px}
+.plist{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.prow.away .pname{color:var(--muted)}
+.pname{overflow-wrap:anywhere}
+.lvlsel{min-height:44px;padding:0 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:inherit;font-size:.95rem}
+.lvlsel:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+.prow .tog{min-width:6.5rem;justify-content:center}
 .redit{display:flex;flex-direction:column;gap:8px}
 .rrow{display:flex;align-items:center;gap:8px}
 .rrow.gone .pin{text-decoration:line-through;opacity:.5}
@@ -313,7 +321,7 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
       <div id="standings"></div>
     </section>
     <section aria-labelledby="h-chars">
-      <h2 id="h-chars">Characters</h2>
+      <h2 id="h-chars">Awards</h2>
       <div id="chars"></div>
     </section>
     <section aria-labelledby="h-stats">
@@ -374,18 +382,28 @@ function buildStats(players,games){
 }
 function combos4(n){const r=[];for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)r.push([a,b,c,d]);return r;}
 function planGames(players,history,count,opts={}){
-  const restarts=opts.restarts||300,rng=mulberry32(opts.seed||7);
+  let restarts=opts.restarts||300;const rng=mulberry32(opts.seed||7);
   const active=players.filter(p=>p.here).map(p=>p.id);
   if(active.length<4||count<=0) return [];
   // With 8 players half the group sits each game; a softer sit-out penalty lets everyone partner everyone
   const sitW=active.length>=8?8:25,sitF=active.length>=8?10:40;
   const off={};players.forEach(p=>off[p.id]=p.offset||0);
+  // Levels: share out games against the top level evenly, and the lowest level faces them least.
+  const lvl={};players.forEach(p=>lvl[p.id]=p.level||2);
+  const lv=active.map(id=>lvl[id]),topL=Math.max(...lv),lowL=Math.min(...lv),rule=topL>lowL;
+  // With levels, the first half of the restarts are the normal planner (so every other rule holds),
+  // the second half lean towards sharing out the top level; the best plan overall wins.
+  const plain=restarts;if(rule)restarts*=2;
+  const isTop=id=>rule&&lvl[id]===topL,isLow=id=>rule&&lvl[id]===lowL;
+  const F0={};active.forEach(id=>F0[id]=0);
+  const faceTop=(g,F)=>{for(const [s,o] of [[g.a,g.b],[g.b,g.a]]){const t=s.filter(isTop).length;if(t)for(const x of o)if(!isTop(x)&&x in F)F[x]+=t;}};
+  if(rule)history.forEach(g=>faceTop(g,F0));
   const base=buildStats(players,history);
   const last=history[history.length-1];
   const C=combos4(active.length);
   let best=null,bestScore=Infinity;
   for(let r=0;r<restarts;r++){
-    const gp={...base.gp},P={...base.P},O={...base.O};
+    const gp={...base.gp},P={...base.P},O={...base.O},F={...F0},nudge=r>=plain;
     let lastIn=last?new Set([...last.a,...last.b]):null;
     const plan=[];let sitTwice=0;
     for(let k=0;k<count;k++){
@@ -403,7 +421,9 @@ function planGames(players,history,count,opts={}){
           const p1=P[pk(a[0],a[1])]||0,p2=P[pk(b[0],b[1])]||0;
           const part=((p1+1)**2-1+(p2+1)**2-1)*4;
           let opp=0;for(const u of a)for(const v of b)opp+=(O[pk(u,v)]||0);
-          const cost=fair+sit+part+opp*0.6+rng()*3;
+          let top=0;
+          if(nudge)for(const [s,o] of [[a,b],[b,a]]){const t=s.filter(isTop).length;if(t)for(const x of o)if(!isTop(x))top+=((F[x]+t)**2-F[x]**2)*(isLow(x)?4:2);}
+          const cost=fair+sit+part+opp*0.6+top+rng()*(nudge?3+(r%4)*10:3);
           if(cost<optC){optC=cost;opt={a,b};}
         }
       }
@@ -413,6 +433,7 @@ function planGames(players,history,count,opts={}){
       P[pk(opt.a[0],opt.a[1])]=(P[pk(opt.a[0],opt.a[1])]||0)+1;
       P[pk(opt.b[0],opt.b[1])]=(P[pk(opt.b[0],opt.b[1])]||0)+1;
       for(const u of opt.a)for(const v of opt.b)O[pk(u,v)]=(O[pk(u,v)]||0)+1;
+      if(rule)faceTop(opt,F);
       plan.push(opt);lastIn=new Set(ids);
     }
     let unc=0,rep=0,opp2=0;
@@ -421,10 +442,60 @@ function planGames(players,history,count,opts={}){
     }
     const effs=active.map(id=>(gp[id]||0)+off[id]);
     const imb=Math.max(...effs)-Math.min(...effs);
-    const score=unc*100+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3;
+    let topScore=0;
+    if(rule){
+      const nt=active.filter(id=>!isTop(id)),m=nt.reduce((s,id)=>s+F[id],0)/nt.length;
+      topScore=nt.reduce((s,id)=>s+(F[id]-m)**2,0)/nt.length*20+nt.filter(isLow).reduce((s,id)=>s+Math.max(0,F[id]-m)**2,0)*20;
+    }
+    const score=unc*1000+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3+topScore;
     if(score<bestScore){bestScore=score;best=plan;}
   }
+  if(rule&&best)best=polish(best);
   return best;
+
+  // Score a whole plan the same way as above (used by the polishing step).
+  function scorePlan(plan){
+    const gp={...base.gp},P={...base.P},O={...base.O},F={...F0};
+    let lastIn=last?new Set([...last.a,...last.b]):null,sitTwice=0;
+    for(const g of plan){
+      const ids=[...g.a,...g.b];
+      if(lastIn){for(const id of active)if(!ids.includes(id)&&!lastIn.has(id))sitTwice++;}
+      for(const id of ids)gp[id]=(gp[id]||0)+1;
+      P[pk(g.a[0],g.a[1])]=(P[pk(g.a[0],g.a[1])]||0)+1;P[pk(g.b[0],g.b[1])]=(P[pk(g.b[0],g.b[1])]||0)+1;
+      for(const u of g.a)for(const v of g.b)O[pk(u,v)]=(O[pk(u,v)]||0)+1;
+      faceTop(g,F);lastIn=new Set(ids);
+    }
+    let unc=0,rep=0,opp2=0;
+    for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
+      const p=P[pk(active[i],active[j])]||0;if(p===0)unc++;rep+=p*p;opp2+=(O[pk(active[i],active[j])]||0)**2;
+    }
+    const effs=active.map(id=>(gp[id]||0)+off[id]),imb=Math.max(...effs)-Math.min(...effs);
+    const nt=active.filter(id=>!isTop(id)),m=nt.reduce((s,id)=>s+F[id],0)/nt.length;
+    const topScore=nt.reduce((s,id)=>s+(F[id]-m)**2,0)/nt.length*20+nt.filter(isLow).reduce((s,id)=>s+Math.max(0,F[id]-m)**2,0)*20;
+    return unc*1000+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3+topScore;
+  }
+  // Swap opponents between two games (every partnership and game count stays the same,
+  // only who faces whom changes), or swap the order of two games. Keep any change that scores better.
+  function polish(plan){
+    let cur=plan.map(g=>({a:[...g.a],b:[...g.b]})),cs=scorePlan(cur);
+    for(let pass=0,better=true;better&&pass<40;pass++){
+      better=false;
+      for(let i=0;i<cur.length;i++)for(let j=i+1;j<cur.length;j++){
+        const tries=[[cur[j],cur[i]]];
+        for(const si of ['a','b'])for(const sj of ['a','b']){
+          const ki=si==='a'?'b':'a',kj=sj==='a'?'b':'a';
+          tries.push([{a:cur[i][ki],b:cur[j][sj]},{a:cur[j][kj],b:cur[i][si]}]);
+        }
+        for(const [g1,g2] of tries){
+          if(new Set([...g1.a,...g1.b]).size<4||new Set([...g2.a,...g2.b]).size<4)continue;
+          const nx=cur.slice();nx[i]=g1;nx[j]=g2;
+          const sc=scorePlan(nx);
+          if(sc<cs-1e-9){cur=nx;cs=sc;better=true;}
+        }
+      }
+    }
+    return cur;
+  }
 }
 
 // ---------- state ----------
@@ -479,13 +550,13 @@ function validScore(a,b){
   return timeIsUp()&&(a!==b||R().timeUp==='draw');
 }
 function rulesLine(r=R()){
-  let s=r.deuce==='none'?`First to ${r.target}`:`First to ${r.target} · deuce from ${r.target-1}–${r.target-1}${r.deuce==='cap'?`, capped at ${r.cap}`:', no cap'}`;
-  if(r.limit)s+=` · ${r.limit}-min games, ${r.timeUp==='draw'?'level at time is a draw':'level at time plays one more point'}`;
+  let s=r.deuce==='none'?`First to ${r.target}`:`First to ${r.target} · deuce from ${r.target-1}–${r.target-1}${r.deuce==='cap'?`, max ${r.cap}`:', no max'}`;
+  if(r.limit)s+=` · ${r.limit}-min games, ${r.timeUp==='draw'?'tied at time is a draw':'tied at time goes to golden point'}`;
   return s;
 }
 function rulesSentence(r=R()){
-  let s=r.deuce==='none'?`First to ${r.target} wins.`:`First to ${r.target}. From ${r.target-1}–${r.target-1}, win by 2${r.deuce==='cap'?`, up to ${r.cap} (${r.cap}–${r.cap-1} wins)`:''}.`;
-  if(r.limit)s+=` Games stop after ${r.limit} minutes: the side ahead wins${r.timeUp==='draw'?', and a level score is a draw.':', and if level, the next point wins.'}`;
+  let s=r.deuce==='none'?`First to ${r.target} wins.`:`First to ${r.target}. From ${r.target-1}–${r.target-1}, win by 2${r.deuce==='cap'?`, max score ${r.cap} (${r.cap}–${r.cap-1} wins)`:''}.`;
+  if(r.limit)s+=` Games stop after ${r.limit} minutes: the side ahead wins${r.timeUp==='draw'?', and a tied score is a draw.':', and if tied, it goes to golden point: the next point wins.'}`;
   return s;
 }
 // deuce games, judged by the rules the game was played under
@@ -495,7 +566,7 @@ const rec=(W,D,P,three)=>D||three?`${W}–${D||0}–${P-W-(D||0)}`:`${W}–${P-W
 const anyDraws=()=>state.history.some(g=>g.sa===g.sb);
 
 function newSession(names,rules){
-  const players=names.map(n=>({id:n,here:true,offset:0}));
+  const players=names.map(n=>typeof n==='string'?{id:n,here:true,offset:0,level:2}:{id:n.id,here:true,offset:0,level:n.level||2});
   const r=sanitizeRules(rules);
   const target=r.rounds*gamesToPairAll(players.length);
   return {players,history:[],plan:planGames(players,[],target),cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:r};
@@ -516,6 +587,17 @@ function removePoint(side){
   const L=curLog();for(let i=L.length-1;i>=0;i--)if(L[i].s===side){L.splice(i,1);break;}
 }
 
+// ---------- levels ----------
+const LEVELS=['Beginner','Intermediate','Advanced','Pro'];
+function levelNote(){
+  const here=state.players.filter(p=>p.here),lv=here.map(p=>p.level||2);
+  if(!here.length)return '';
+  const top=Math.max(...lv),low=Math.min(...lv);
+  if(top===low)return 'Everyone here is at the same level, so matchups only follow the partner rotation.';
+  const at=l=>here.filter(p=>(p.level||2)===l).map(p=>p.id),names=l=>at(l).join(', ');
+  const first=`Games against the top level (${names(top)}) are shared out evenly, so nobody faces them more than their share.`;
+  return at(low).length===here.length-at(top).length?first:`${first} The lowest level (${names(low)}) never faces them more than anyone else.`;
+}
 // ---------- session planner: how long a game takes, and how many fit ----------
 function pace(){
   // seconds per point, learned from the gaps between finished games (minus the changeover)
@@ -556,7 +638,8 @@ function replan(msg){
   const left=Math.max(0,state.target-state.history.length);
   const cur=state.plan[0];
   const here=hereIds();
-  if(cur&&left>0&&[...cur.a,...cur.b].every(id=>here.has(id))){
+  // before Start playing nothing is on court yet, so the first game can change too
+  if(cur&&left>0&&(state.started||state.history.length)&&[...cur.a,...cur.b].every(id=>here.has(id))){
     state.plan=[cur,...planGames(state.players,[...state.history,cur],left-1)];
   }else{
     state.plan=planGames(state.players,state.history,left);
@@ -642,7 +725,7 @@ let courtTimeUp=false;
 function gameTimerText(){
   const r=R(),l=gameMsLeft();
   if(l===null)return `<b>${r.limit}:00</b> game timer starts at the first point`;
-  if(l<=0){const {sa,sb}=state.cur;return `<b>Time's up.</b> ${sa!==sb?'The side ahead wins.':r.timeUp==='draw'?'Level, so it is a draw.':'Level, so the next point wins.'}`;}
+  if(l<=0){const {sa,sb}=state.cur;return `<b>Time's up.</b> ${sa!==sb?'The side ahead wins.':r.timeUp==='draw'?'Tied, so it is a draw.':'Tied, so it goes to golden point: next point wins.'}`;}
   const s=Math.ceil(l/1000);return `<b>${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}</b> left in this game`;
 }
 function nmBtn(id){
@@ -669,10 +752,10 @@ function renderStandings(){
   const wr=r=>r.P?winRate(r):-1,pw=r=>r.pf+r.pa?r.pf/(r.pf+r.pa):0,pd=r=>r.P?(r.pf-r.pa)/r.P:0;
   list.sort((x,y)=>wr(y)-wr(x)||pw(y)-pw(x)||pd(y)-pd(x)||x.id.localeCompare(y.id));
   const any=state.history.length>0,dr=anyDraws();
-  $('#standings').innerHTML=`<div class="tablebox"><table class="stand"><thead><tr><th>#</th><th>Player</th><th>Played</th><th>${dr?'W–D–L':'W–L'}</th><th>Pts</th><th>Won %</th><th>±</th></tr></thead><tbody>
-    ${list.map((r,i)=>{const d=r.pf-r.pa;return `<tr class="${any&&i===0&&r.P?'top':''}"><td>${r.P?i+1:'–'}</td><td>${r.id}</td><td>${r.P}</td><td>${rec(r.W,r.D,r.P,dr)}</td><td>${r.pf}</td><td>${r.P?Math.round(pw(r)*100)+'%':'–'}</td><td class="${d>0?'pos':d<0?'neg':''}">${d>0?'+':''}${d}</td></tr>`}).join('')}
+  $('#standings').innerHTML=`<div class="tablebox"><table class="stand"><thead><tr><th>#</th><th>Player</th><th><abbr title="Played">P</abbr></th><th><abbr title="Won">W</abbr></th>${dr?'<th><abbr title="Drawn">D</abbr></th>':''}<th><abbr title="Lost">L</abbr></th><th><abbr title="Points for">PF</abbr></th><th><abbr title="Points against">PA</abbr></th><th><abbr title="Point difference">PD</abbr></th><th>Pts won %</th></tr></thead><tbody>
+    ${list.map((r,i)=>{const d=r.pf-r.pa;return `<tr class="${any&&i===0&&r.P?'top':''}"><td>${r.P?i+1:'–'}</td><td>${r.id}</td><td>${r.P}</td><td>${r.W}</td>${dr?`<td>${r.D}</td>`:''}<td>${r.P-r.W-r.D}</td><td>${r.pf}</td><td>${r.pa}</td><td class="${d>0?'pos':d<0?'neg':''}">${d>0?'+':''}${d}</td><td>${r.P?Math.round(pw(r)*100)+'%':'–'}</td></tr>`}).join('')}
   </tbody></table></div>
-  <p class="note">Everyone banks their pair's points each game. Ranked by win rate${dr?' (a draw counts as half a win)':''}, then Won %, the share of all points played that their side won. That is fairer than total points, because longer games give everyone more points and some people play one game more.</p>`;
+  <p class="note">P played, W won${dr?', D drawn':''}, L lost, PF points for, PA points against, PD point difference. Everyone gets their pair's points each game. Ranked by win %${dr?' (a draw counts as half a win)':''}, then points won %, the share of all points played that their side won. That is fairer than total points, because longer games give everyone more points and some people play one game more.</p>`;
 }
 // ---------- stats ----------
 let statSort={k:'pw',d:-1},statPlayer=null;
@@ -738,7 +821,7 @@ function archetypes(){
     const G=R[r.id];
     if(r===top&&r.W>0){
       const beat=new Set();G.filter(x=>x.m<0).forEach(x=>x.opp.forEach(o=>beat.add(o)));
-      add(r.id,'boss','The Final Boss',100,`Top of the table at ${rec(r.W,r.D,r.P)}. ${beat.size?`Only ${[...beat].join(' and ')} managed to beat them.`:'Nobody beat them all night.'}`);
+      add(r.id,'boss','The Final Boss',100,`Top of the table at ${rec(r.W,r.D,r.P)}. ${!beat.size?'Nobody beat them all night.':beat.size<=2?`Only ${[...beat].join(' and ')} managed to beat them.`:`Lost only ${G.filter(x=>x.m<0).length} of ${r.P} games.`}`);
     }
     if(r!==top){
       const k=G.filter(x=>x.win&&x.opp.includes(top.id));
@@ -775,7 +858,7 @@ function archetypes(){
 function renderChars(){
   const list=archetypes();
   $('#chars').innerHTML=list.length?`<ul class="chars">${list.map(c=>`<li><span class="cn">${c.id}</span><div><div class="ct">${c.title}</div><p class="cw">${c.why}</p></div></li>`).join('')}</ul>
-  <p class="note">Earned from tonight's results, one title each. They update as games are added.</p>`:'<p class="muted">Everyone gets a title after a couple of games.</p>';
+  <p class="note">Earned from tonight's results, one award each. They update as games are added.</p>`:'<p class="muted">Everyone gets an award after a couple of games.</p>';
 }
 function renderStats(){
   const el=$('#stats'),H=state.history;
@@ -795,7 +878,7 @@ function renderStats(){
   const gameWho=({g,i})=>{if(g.sa===g.sb)return `${names(g.a)}<span class="ts"> drew with ${names(g.b)} · G${i+1}</span>`;const aw=g.sa>g.sb;return `${names(aw?g.a:g.b)}<span class="ts"> beat ${names(aw?g.b:g.a)} · G${i+1}</span>`;};
   const score=({g})=>`${Math.max(g.sa,g.sb)}–${Math.min(g.sa,g.sb)}`;
   const tiles=[
-    ['Best share of points',Math.round(sc.v*100)+'%','won',who(sc.who)],
+    ['Best points won %',Math.round(sc.v*100)+'%','',who(sc.who)],
     ['Best partnership',sgn(pr.pd/pr.G),'a game',`${names(pr.ids)}<span class="ts"> · ${rec(pr.W,pr.D,pr.G)} together</span>`],
     ['Longest win streak',String(st.v),st.v===1?'win':'wins in a row',st.v>0?who(st.who):'Nobody yet'],
     deuceOn?['Most deuce wins',String(dk.v),dk.v===1?'game':'games',dk.v>0?who(dk.who):'No deuce games yet']:null,
@@ -805,7 +888,7 @@ function renderStats(){
   const maxM=Math.max(1,...H.map(mg));
   const anyCr=H.some(g=>g.cr);
   pl.forEach(r=>{r.crs=r.crTeam?r.crt/r.crTeam:-1;});
-  const cols=[['id','Player'],['P','Played'],['wr','Win %'],['pw','Won %'],['pfg','Pts/G'],['pag','Agst/G'],['pdg','±/G']].concat(deuceOn?[['dw','Deuce']]:[],anyCr?[['crt','Credits'],['crs','Cr %']]:[]);
+  const cols=[['id','Player'],['P','P'],['wr','Win %'],['pw','Pts won %'],['pfg','PF/G'],['pag','PA/G'],['pdg','PD/G']].concat(deuceOn?[['dw','Deuce W–L']]:[],anyCr?[['crt','Own pts'],['crs','Own share']]:[]);
   const {k,d}=statSort;
   const rows=[...pl].sort((x,y)=>{const a=x[k],b=y[k];const c=typeof a==='string'?a.localeCompare(b):a-b;return c*d||y.pdg-x.pdg||x.id.localeCompare(y.id);});
   if(!statPlayer||!S[statPlayer]||!S[statPlayer].P)statPlayer=[...pl].sort((x,y)=>y.pw-x.pw)[0].id;
@@ -815,7 +898,7 @@ function renderStats(){
   const byPd=(x,y)=>y.pdg-x.pdg||y.G-x.G||x.id.localeCompare(y.id);
   partners.sort(byPd);opps.sort(byPd);
   const notYet=state.players.filter(p=>p.here&&p.id!==me.id&&!partners.some(q=>q.id===p.id)).map(p=>p.id);
-  const mini=(title,list)=>`<div><h3 class="sub">${title}</h3><div class="tablebox"><table class="stat"><thead><tr><th></th><th>Games</th><th>${drawN?'W–D–L':'W–L'}</th><th>±/G</th></tr></thead><tbody>${list.map(r=>`<tr><td>${r.id}</td><td>${r.G}</td><td>${rec(r.W,r.D,r.G,drawN>0)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td></tr>`).join('')}</tbody></table></div></div>`;
+  const mini=(title,list)=>`<div><h3 class="sub">${title}</h3><div class="tablebox"><table class="stat"><thead><tr><th></th><th>P</th><th>${drawN?'W–D–L':'W–L'}</th><th>PD/G</th></tr></thead><tbody>${list.map(r=>`<tr><td>${r.id}</td><td>${r.G}</td><td>${rec(r.W,r.D,r.G,drawN>0)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td></tr>`).join('')}</tbody></table></div></div>`;
   let line=`<b>${me.id}</b>: ${me.P} game${me.P>1?'s':''}, ${rec(me.W,me.D,me.P)},${me.pfg.toFixed(1)} points a game, ${Math.round(me.pw*100)}% of points won.`;
   if(me.crt)line+=` Won ${me.crt} points personally, ${Math.round(me.crt/me.crTeam*100)}% of their side's points in games with credits.`;
   if(partners.length)line+=` Best with ${partners[0].id} (${sgn(partners[0].pdg)} a game).`;
@@ -828,7 +911,7 @@ function renderStats(){
   <div class="tablebox"><table class="stat"><thead><tr>${cols.map(([key,lab])=>`<th aria-sort="${k===key?(d>0?'ascending':'descending'):'none'}"><button class="sortb" data-act="sort" data-k="${key}">${lab}${k===key?(d>0?' ▲':' ▼'):''}</button></th>`).join('')}<th class="form">Form</th></tr></thead><tbody>
   ${rows.map(r=>`<tr class="${r.id===statPlayer?'selrow':''}"><td><button class="pbtn" data-act="statp" data-id="${r.id}">${r.id}</button></td><td>${r.P}</td><td>${Math.round(r.wr*100)}%</td><td>${Math.round(r.pw*100)}%</td><td>${r.pfg.toFixed(1)}</td><td>${r.pag.toFixed(1)}</td><td class="${r.pdg>0?'pos':r.pdg<0?'neg':''}">${sgn(r.pdg)}</td>${deuceOn?`<td>${r.dW+r.dL?`${r.dW}–${r.dL}`:'–'}</td>`:''}${anyCr?`<td>${r.crG?r.crt:'–'}</td><td>${r.crTeam?Math.round(r.crs*100)+'%':'–'}</td>`:''}<td class="form">${spark(r.form,maxM)}</td></tr>`).join('')}
   </tbody></table></div>
-  <p class="note">Tap a column to sort, or a name for their breakdown. Won % is the share of all points played that the player's side won.${drawN?' Win % counts a draw as half a win.':''}${deuceOn?' Deuce is the win–loss record in games that went to deuce.':''}${anyCr?'Credits are points won by tapping the player\'s name; Cr % is their share of their side\'s points in those games. ':''}Form shows the margin of each game, oldest first: bars up for wins, down for losses${drawN?', a flat mark for draws':''}.</p>
+  <p class="note">Tap a column to sort, or a name for their breakdown. P played; PF, PA and PD per game are points for, against and the difference. Pts won % is the share of all points played that the player's side won.${drawN?' Win % counts a draw as half a win.':''}${deuceOn?' Deuce W–L is the record in games that went to deuce.':''}${anyCr?' Own pts are points the player won personally, tapped on their name; own share is their part of their side\'s points in those games.':''} Form shows the margin of each game, oldest first: bars up for wins, down for losses${drawN?', a flat mark for draws':''}.</p>
   <h3 class="sub">Breakdown</h3>
   <div class="pickrow">${state.players.filter(p=>S[p.id].P).map(p=>`<button class="chip ${p.id===me.id?'sel':''}" data-act="statp" data-id="${p.id}" aria-pressed="${p.id===me.id}">${p.id}</button>`).join('')}</div>
   <p class="muted">${line}</p>
@@ -873,8 +956,13 @@ function renderPairs(){
 function renderRoster(){
   const el=$('#roster');
   if(!editing){
-    el.innerHTML=`<p class="muted">Tap a name when someone arrives or leaves. The games after the current one are re-planned.</p>
-    <div class="roster">${state.players.map(p=>`<button class="tog ${p.here?'on':''}" data-act="toggle" data-id="${p.id}" aria-pressed="${p.here}"><b>${p.id}</b><span class="st">${p.here?'Here':'Not here'}</span></button>`).join('')}</div>
+    el.innerHTML=`<p class="muted">Set each player's level and mark who's here. Changes re-plan the games after the one on court.</p>
+    <div class="plist">${state.players.map((p,i)=>`<div class="prow ${p.here?'':'away'}">
+      <b class="pname">${p.id}</b>
+      <select class="lvlsel" id="lvl-${i}" data-lvl="${i}" aria-label="${p.id}'s level">${LEVELS.map((l,k)=>`<option value="${k+1}" ${(p.level||2)===k+1?'selected':''}>${l}</option>`).join('')}</select>
+      <button class="tog ${p.here?'on':''}" data-act="toggle" data-id="${p.id}" aria-pressed="${p.here}"><span class="st">${p.here?'Here':'Not here'}</span></button>
+    </div>`).join('')}</div>
+    <p class="note">${levelNote()}</p>
     <div><button class="btn ghost" id="editbtn" data-act="edit">Edit players</button></div>`;
     return;
   }
@@ -887,7 +975,7 @@ function renderRoster(){
     </div>`).join('')}
     ${kept<MAX_PLAYERS?`<div class="rrow"><input id="pn-new" class="pin" placeholder="Add a player" maxlength="12" autocomplete="off" aria-label="New player name"></div>`:''}
     ${editErr?`<p class="rerr" role="alert">${editErr}</p>`:''}
-    <div class="ractions"><button type="submit" class="btn primary">Save players</button><button type="button" class="btn ghost" data-act="canceledit">Cancel</button></div>
+    <div class="ractions"><button type="button" class="btn primary" id="saveroster" data-act="saveroster">Save players</button><button type="button" class="btn ghost" data-act="canceledit">Cancel</button></div>
     <p class="note">Up to ${MAX_PLAYERS} players, 12 characters each. Someone who has played this session can be renamed but not removed; mark them Not here instead.</p>
   </form>`;
 }
@@ -923,7 +1011,7 @@ function saveRoster(){
   if(add){
     const st=buildStats(state.players,state.history),here=state.players.filter(p=>p.here);
     const minEff=here.length?Math.min(...here.map(p=>st.gp[p.id]+(p.offset||0))):0;
-    state.players.push({id:add,here:true,offset:minEff});
+    state.players.push({id:add,here:true,offset:minEff,level:2});
   }
   editing=false;editDraft=null;
   const changed=removed.length||add;
@@ -948,10 +1036,10 @@ function renderMode(){
   <div class="pickrow">${PRESETS.map(p=>`<button class="chip ${pre&&pre.id===p.id?'sel':''}" id="preset-${p.id}" data-act="preset" data-id="${p.id}" aria-pressed="${!!pre&&pre.id===p.id}" ${lk?'disabled':''}>${p.label}</button>`).join('')}</div>
   <p class="rulesum">${rulesSentence()}</p>
   <div class="setrow"><b>Points to win</b>${stepHTML('target',r.target,lk||r.target<=5,lk||r.target>=30,'points to win')}</div>
-  <div class="setcol"><div><b>Deuce</b><p class="muted">${r.deuce==='none'?`The first side to ${r.target} wins.`:`From ${r.target-1}–${r.target-1}, a side must win by 2.`}</p></div>${segHTML('deuce',[['none','Off'],['cap','On, capped'],['nocap','On, no cap']],r.deuce,'Deuce',lk)}</div>
-  ${r.deuce==='cap'?`<div class="setrow"><div><b>Cap</b><p class="muted num">${r.cap}–${r.cap-1} wins the game.</p></div>${stepHTML('cap',r.cap,lk||r.cap<=r.target+1,lk||r.cap>=r.target+15,'cap')}</div>`:''}
+  <div class="setcol"><div><b>Deuce</b><p class="muted">${r.deuce==='none'?`The first side to ${r.target} wins.`:`From ${r.target-1}–${r.target-1}, a side must win by 2.`}</p></div>${segHTML('deuce',[['none','Off'],['cap','On, with max'],['nocap','On, no max']],r.deuce,'Deuce',lk)}</div>
+  ${r.deuce==='cap'?`<div class="setrow"><div><b>Max score</b><p class="muted num">${r.cap}–${r.cap-1} wins the game.</p></div>${stepHTML('cap',r.cap,lk||r.cap<=r.target+1,lk||r.cap>=r.target+15,'max score')}</div>`:''}
   <div class="setrow"><div><b>Time limit per game</b><p class="muted">${r.limit?'Starts at the first point of each game.':'Off. Games play to the score.'}</p></div>${stepHTML('limit',r.limit?`${r.limit}<span class="unit">min</span>`:'Off',lk||r.limit===0,lk||r.limit>=30,'time limit')}</div>
-  ${r.limit?`<div class="setcol"><b>Level when time is up</b>${segHTML('timeUp',[['golden','Next point wins'],['draw','Draw']],r.timeUp,'Level when time is up',lk)}</div>`:''}
+  ${r.limit?`<div class="setcol"><div><b>Tied when time runs out</b><p class="muted">Golden point: the next point wins.</p></div>${segHTML('timeUp',[['golden','Golden point'],['draw','Draw']],r.timeUp,'Tied when time runs out',lk)}</div>`:''}
   <p class="note">Changes apply from the next game. Finished games keep their scores.</p>`;
 }
 // ---------- about ----------
@@ -966,22 +1054,26 @@ function renderAbout(){
     <ol>
       <li><a href="#setup">Setup</a>: add or rename players, pick a game mode, check the session fits your booking, then tap <b>Start playing</b>.</li>
       <li><a href="#play">Play</a>: tap a player's name when they win a point, or tap a side's score when nobody in particular earned it. Tap <b>Finish</b> when the game is over.</li>
-      <li><a href="#results">Results</a>: standings, characters and stats update after every game. Copy them for the group chat at the end.</li>
+      <li><a href="#results">Results</a>: standings, awards and stats update after every game. Copy them for the group chat at the end.</li>
     </ol></section>
   <section><h2>How the pairs are chosen</h2>
     <p>Each game uses two partnerships. With ${n} players there are ${n*(n-1)/2} possible pairs, so it takes ${G} games for everyone to partner everyone once. The app shares games out evenly and avoids anyone sitting out twice in a row where it can.</p>
     <p>If someone arrives late or leaves early, mark them in Setup. The games after the one on court are re-planned.</p></section>
+  <section><h2>Levels</h2>
+    <p>Each player picks a level in Setup: Beginner, Intermediate, Advanced or Pro. It can be their own view or the group's, and it only needs to be right relative to whoever is playing that night.</p>
+    <p>Levels never change who partners whom: everyone still partners everyone. They only decide who plays against the strongest players. Games against the top level are shared out evenly, so the weakest player doesn't keep getting the strongest opponents. If everyone is at the same level, this switches off. You can change a level at any time and the games after the one on court are re-planned.</p></section>
   <section><h2>Tonight's rules</h2><p>${rulesSentence()}</p></section>
   <section><h2>Reading the numbers</h2>
     <dl>
+      <dt>P, W, D, L</dt><dd>Games played, won, drawn and lost.</dd>
+      <dt>PF, PA, PD</dt><dd>Points for, points against, and point difference (PF − PA). /G means per game.</dd>
       <dt>Win %</dt><dd>Games won. A draw counts as half a win.</dd>
-      <dt>Won %</dt><dd>The share of all points played that your side won. It breaks ties in the standings, because longer games and extra games give more points.</dd>
-      <dt>±</dt><dd>Points won minus points lost.</dd>
-      <dt>Credits</dt><dd>Points won while you were tapped as the player who won them.</dd>
-      <dt>Deuce</dt><dd>Your record in games that went to deuce.</dd>
+      <dt>Pts won %</dt><dd>The share of all points played that your side won. It breaks ties in the standings, because longer games and extra games give more points.</dd>
+      <dt>Own pts</dt><dd>Points you won personally, when the scorer tapped your name.</dd>
+      <dt>Deuce W–L</dt><dd>Your record in games that went to deuce.</dd>
     </dl></section>
-  <section><h2>Characters</h2>
-    <p>Everyone gets one title from the night's results. Each title goes to one player only.</p>
+  <section><h2>Awards</h2>
+    <p>Everyone gets one award from the night's results. Each award goes to one player only.</p>
     <dl>${CHAR_INFO.map(([t,d])=>`<dt>${t}</dt><dd>${d}</dd>`).join('')}</dl></section>
   <section><h2>Your data</h2>
     <p>Everything stays in this browser on this phone. Nothing is uploaded. Clearing browser data or using a private window loses it, so use <b>Copy session</b> in Setup to keep a backup.</p>
@@ -996,8 +1088,8 @@ function shareText(){
   pl.sort((x,y)=>y.wr-x.wr||y.pw-x.pw||y.pd-x.pd||x.id.localeCompare(y.id));
   const chars=archetypes();
   const lines=[`Badminton Doubles · ${dayLabel()}`,`${H.length} game${H.length>1?'s':''} · ${rulesLine()}`,'','Standings'];
-  pl.forEach((r,i)=>lines.push(`${i+1}. ${r.id}  ${rec(r.W,r.D,r.P)}  (${Math.round(r.pw*100)}% of points)`));
-  if(chars.length){lines.push('','Characters');chars.forEach(c=>lines.push(`${c.id}: ${c.title}`));}
+  pl.forEach((r,i)=>lines.push(`${i+1}. ${r.id}  ${rec(r.W,r.D,r.P)}  (${Math.round(r.pw*100)}% points won)`));
+  if(chars.length){lines.push('','Awards');chars.forEach(c=>lines.push(`${c.id}: ${c.title}`));}
   return lines.join('\n');
 }
 function renderShare(){
@@ -1036,13 +1128,13 @@ function renderSession(){
   <div class="setrow"><div><b>Session length</b><p class="muted">The whole booking, warm-up included.</p></div>${stepHTML('sessionMin',fmtDur(r.sessionMin),r.sessionMin<=30,r.sessionMin>=300,'session length')}</div>
   <div class="setrow"><div><b>Warm-up</b><p class="muted">Time before the first scored game.</p></div>${stepHTML('warmup',r.warmup?`${r.warmup}<span class="unit">min</span>`:'None',r.warmup<=0,r.warmup>=Math.min(60,r.sessionMin-15),'warm-up')}</div>
   <div class="setrow"><div><b>Rounds</b><p class="muted">How many times everyone partners everyone.</p></div>${stepHTML('rounds',r.rounds,r.rounds<=1,r.rounds>=4,'rounds')}</div>
-  <div class="setrow"><div><b>Games tonight</b><p class="muted">Set it yourself, or use the buttons above.</p></div>
+  <div class="setrow"><div><b>Total games</b><p class="muted">Set it yourself, or use the buttons above.</p></div>
     <div class="stepper"><button class="step" id="tdec" data-act="tdec" aria-label="One game fewer" ${state.target<=min?'disabled':''}>−</button><output class="num">${state.target}</output><button class="step" id="tinc" data-act="tinc" aria-label="One game more">+</button></div></div>
   ${!state.started&&!state.history.length?`<div class="startcard"><p><b>Ready?</b> ${nHere} players, ${state.target} games. ${rulesSentence()}</p><button class="btn primary full" id="startplay" data-act="startplay">Start playing</button></div>`:''}
     <div class="setrow"><p class="muted">Clear all scores and start a new session. Players and game mode are kept.</p><button class="btn danger" id="reset" data-act="reset">${resetArmed?'Tap again to clear':'Reset session'}</button></div>`;
 }
 let importing=false,importErr='',exportText='',exportNote='',pendingImport=null;
-function sessionData(){return {app:'thursday-doubles',v:4,date:state.date||ymd(sessionDay()),players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0})),history:state.history,target:state.target,rules:R()};}
+function sessionData(){return {app:'thursday-doubles',v:4,date:state.date||ymd(sessionDay()),players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0,level:p.level||2})),history:state.history,target:state.target,rules:R()};}
 function sessionText(){return JSON.stringify(sessionData());}
 // check a saved session; returns {err} or {d} without touching the current one
 function parseSession(txt){
@@ -1058,7 +1150,7 @@ function parseSession(txt){
 function importSession(txt){const r=parseSession(txt);if(r.err)return r.err;applySession(r.d);return '';}
 function applySession(d){
   const ids=d.players.map(p=>p.id);
-  const players=d.players.map(p=>({id:p.id,here:p.here!==false,offset:Math.max(0,+p.offset||0)}));
+  const players=d.players.map(p=>({id:p.id,here:p.here!==false,offset:Math.max(0,+p.offset||0),level:[1,2,3,4].includes(p.level)?p.level:2}));
   const history=d.history.map(g=>{const o={a:g.a.slice(),b:g.b.slice(),sa:g.sa,sb:g.sb,t:+g.t||0};
     if(Number.isInteger(g.to)&&g.to>=3&&g.to<=50)o.to=g.to;
     if(g.dz===false)o.dz=false;
@@ -1091,7 +1183,7 @@ function renderBackup(){
   ${importing?`<form id="importform" class="redit" novalidate><label class="muted" for="importtext">Paste a copied session. Loading it replaces the session on this phone.</label>
     <textarea id="importtext" class="pin ta" rows="4" placeholder="Paste here"></textarea>
     ${importErr?`<p class="rerr" role="alert">${importErr}</p>`:''}
-    <div class="ractions"><button type="submit" class="btn primary">Load session</button><button type="button" class="btn ghost" data-act="importcancel">Cancel</button></div></form>`:''}`;
+    <div class="ractions"><button type="button" class="btn primary" id="importload" data-act="importload">Load session</button><button type="button" class="btn ghost" data-act="importcancel">Cancel</button></div></form>`:''}`;
 }
 const esc=x=>String(x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // save a file: the Claude viewer's save prompt, or a normal browser download on the website
@@ -1155,6 +1247,8 @@ document.addEventListener('click',e=>{
   if(act==='importdrop'){pendingImport=null;importErr='';renderBackup();return;}
   if(act==='importopen'){importing=!importing;importErr='';exportText='';exportNote='';renderBackup();return;}
   if(act==='importcancel'){importing=false;importErr='';renderBackup();return;}
+  if(act==='saveroster'){saveRoster();return;}
+  if(act==='importload'){loadPasted();return;}
   if(act==='edit'){editing=true;editErr='';editDraft=state.players.map(p=>({orig:p.id,name:p.id,rm:false}));renderRoster();return;}
   if(act==='canceledit'){editing=false;editDraft=null;editErr='';renderRoster();return;}
   if(act==='rm'){const i=+b.dataset.i;editDraft.forEach((r,j)=>{const inp=$('#pn-'+j);if(inp&&!r.rm)r.name=inp.value;});editDraft[i].rm=!editDraft[i].rm;renderRoster();return;}
@@ -1248,10 +1342,15 @@ document.addEventListener('click',e=>{
   }
   if(act==='reset'){
     if(!resetArmed){resetArmed=true;renderSession();clearTimeout(resetT);resetT=setTimeout(()=>{resetArmed=false;renderSession();},3500);return;}
-    resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>p.id),state.rules);save();render();goTab('setup');toast('New session ready. Players and game mode are kept.');return;
+    resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>({id:p.id,level:p.level})),state.rules);save();render();goTab('setup');toast('New session ready. Players and game mode are kept.');return;
   }
 });
 document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('.tabbar a');if(a&&a.getAttribute&&typeof location!=='undefined'&&a.getAttribute('href')===location.hash){e.preventDefault();window.scrollTo({top:0,behavior:'smooth'});}});
+document.addEventListener('change',e=>{
+  const t=e.target;if(!t||!t.dataset||t.dataset.lvl===undefined)return;
+  const p=state.players[+t.dataset.lvl],v=+t.value;if(!p||![1,2,3,4].includes(v))return;
+  p.level=v;replan(`${p.id} is now ${LEVELS[v-1]}. Games after this one are re-planned.`);
+});
 document.addEventListener('change',e=>{
   const inp=e.target;if(!inp||inp.id!=='importfile'||!inp.files||!inp.files[0])return;
   const f=inp.files[0];importErr='';pendingImport=null;
@@ -1265,14 +1364,17 @@ document.addEventListener('change',e=>{
     importing=false;renderBackup();
   }).catch(()=>{importErr="That file couldn't be read. Try exporting it again.";renderBackup();});
 });
-document.addEventListener('submit',e=>{
-  if(e.target.id==='rosterform'){e.preventDefault();saveRoster();}
-  if(e.target.id==='importform'){
-    e.preventDefault();
-    const err=importSession(($('#importtext')||{}).value||'');
-    if(err){importErr=err;renderBackup();return;}
-    importing=false;importErr='';save();render();goTab(state.plan.length?'play':'results');toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
-  }
+// Forms are only page UI here: the Claude viewer blocks real form submission, so the buttons do the work.
+function loadPasted(){
+  const err=importSession(($('#importtext')||{}).value||'');
+  if(err){importErr=err;renderBackup();return;}
+  importing=false;importErr='';save();render();goTab(state.plan.length?'play':'results');toast(`Loaded ${state.history.length} games for ${state.players.length} players.`);
+}
+document.addEventListener('submit',e=>{e.preventDefault();if(e.target.id==='rosterform')saveRoster();});
+// Enter in a player name saves, like a normal form
+document.addEventListener('keydown',e=>{
+  const t=e.target;if(e.key!=='Enter'||!t||!t.closest||!t.closest('#rosterform')||t.tagName!=='INPUT')return;
+  e.preventDefault();saveRoster();
 });
 setInterval(()=>{if(!state)return;renderClock();if(state.clockStart&&!resetArmed)renderSession();},20000);
 // per-game countdown: update the line every second, redraw the court once when time runs out

@@ -1,13 +1,13 @@
 # Badminton Doubles
 
-A badminton doubles scorekeeper for 4 to 8 players sharing one court. It plans who plays with whom so that everyone partners everyone, keeps score from one phone, and turns the night's results into standings, stats and a fun title for each player.
+A badminton doubles scorekeeper for 4 to 8 players sharing one court. It plans who plays with whom so that everyone partners everyone, keeps score from one phone, and turns the night's results into standings, stats and an award for each player.
 
 It is a single HTML file with no backend, account or install. Open it in a phone browser, or add it to your home screen.
 
 <p>
   <img src="docs/court.png" alt="Game in progress: the court with four players, the score 10–8, and the next games in the queue" width="260">
   <img src="docs/standings.png" alt="Standings table ranked by win rate, then share of points won" width="260">
-  <img src="docs/characters.png" alt="Characters: a fun title for each player, such as The Final Boss and Giant Killer" width="260">
+  <img src="docs/characters.png" alt="Awards: a fun title for each player, such as The Final Boss and Giant Killer" width="260">
   <img src="docs/game-mode.png" alt="Game mode settings and the session planner estimating how many games fit" width="260">
 </p>
 
@@ -18,29 +18,44 @@ It is a single HTML file with no backend, account or install. Open it in a phone
 | Tab | What's on it |
 |---|---|
 | **Play** | The court, the score, the game timer and who's up next. Nothing else, so you never scroll while scoring. |
-| **Results** | Standings, characters and highlights, with per-player stats, partners and every game folded away underneath. |
+| **Results** | Standings, awards and highlights, with per-player stats, partners and every game folded away underneath. |
 | **Setup** | Players, game mode, the session planner, export and import, and reset. A new session starts here and ends with **Start playing**. |
-| **About** | What the app is, how to use it, and what the numbers and characters mean. |
+| **About** | What the app is, how to use it, and what the numbers and awards mean. |
 
 The top of every tab shows the day and date of the session, taken from when you start playing, and the rules line under the title is a shortcut to Setup.
 
 ## What it does
 
 - **Partner rotation.** Plans the games so every pair partners at least once, games are shared out evenly, and nobody sits out more than they have to.
+- **Levels.** Each player can be set as Beginner, Intermediate, Advanced or Pro. The planner shares out games against the top level evenly, so the weakest player doesn't keep getting the strongest opponents.
 - **Late arrivals and early leavers.** Mark someone as here or not here and the remaining games are re-planned. The game on court stays as it is unless someone in it leaves.
 - **Scoring from one phone.** Tap a player's name to give their side the point and credit that player, or tap a side's score when nobody in particular earned it. **Undo last point** takes back the last tap. Scores follow the game mode you pick, so a game can't be finished on an impossible score.
 - **Safety nets.** After **Finish**, an **Undo** button appears for a few seconds. **Reset to 0–0** needs two taps. The game mode is locked while a game is in progress.
-- **Game modes.** Points to win, deuce with or without a cap, and an optional time limit per game where a level score is either a draw or goes to a deciding point.
+- **Game modes.** Points to win, deuce with or without a max score, and an optional time limit per game where a tied score is either a draw or goes to golden point (next point wins).
 - **Session planner.** Estimates how long a game takes and how many fit in your booking. When they don't fit, it suggests a lower score, a time limit, or fewer games.
-- **Standings.** Ranked by win rate, then by **Won %**, the share of all points played that your side won.
-- **Stats.** Points per game, points conceded, ± per game, deuce record, personal credits, a form chart for each player, and a breakdown of how each player does with each partner and against each opponent.
-- **Characters.** One title per player, earned from the night's results.
+- **Standings.** A league table with P, W, D, L, PF (points for), PA (points against) and PD (point difference), ranked by win %, then by **points won %**, the share of all points played that your side won.
+- **Stats.** PF, PA and PD per game, deuce W–L, own points (points a player won personally, tapped on their name), a form chart for each player, and a breakdown of how each player does with each partner and against each opponent.
+- **Awards.** One award per player, earned from the night's results.
 - **Partners grid.** Shows which pairs have played together, which are coming up, and which won't fit in the games planned.
 - **Results list** with undo for the last game.
-- **Copy for group chat.** Copies the standings and characters as text, ready to paste.
+- **Copy for group chat.** Copies the standings and awards as text, ready to paste.
 - **Session clock** for your booking, with a warm-up countdown and the time left per remaining game.
 - **Export and import.** Save a session as a `.json` file to keep it or open it on another phone, or copy and paste it as text.
 - Works offline once it has been opened online, and follows the phone's light or dark mode.
+
+## Levels
+
+Set each player's level on **Setup → Players**: Beginner, Intermediate, Advanced or Pro. It can be the player's own view or the group's, and it only needs to be right relative to whoever is playing that night. Everyone starts at Intermediate.
+
+Levels never change who partners whom: everyone still partners everyone, game counts stay even, and nobody sits out twice in a row (with up to 7 players). They only decide who plays against the strongest players:
+
+- Games against the top level are shared out evenly. With one top-level player among 7, everyone faces them exactly twice.
+- The lowest level never faces the top level more than anyone else.
+- If everyone is at the same level, the rule switches off and the plan is the same as before.
+
+Change a level at any time and the games after the one on court are re-planned. Before **Start playing**, the first game can change too. Levels are kept when you reset the session and are saved in exported files.
+
+With 8 players, sharing out the top player costs a few extra back-to-back rests, because half the group sits out every game.
 
 ## Game modes
 
@@ -48,16 +63,16 @@ Set these on **Setup → Game mode**, or tap a preset:
 
 | Preset | Points to win | Deuce | Time limit |
 |---|---|---|---|
-| Club 15 (default) | 15 | From 14–14 win by 2, capped at 20 | None |
-| Quick 11 | 11 | From 10–10 win by 2, capped at 15 | None |
-| Official 21 | 21 | From 20–20 win by 2, capped at 30 | None |
-| Timed 10 min | 21 | From 20–20 win by 2, capped at 30 | 10 min, level is a draw |
+| Club 15 (default) | 15 | From 14–14 win by 2, max score 20 | None |
+| Quick 11 | 11 | From 10–10 win by 2, max score 15 | None |
+| Official 21 | 21 | From 20–20 win by 2, max score 30 | None |
+| Timed 10 min | 21 | From 20–20 win by 2, max score 30 | 10 min, tied is a draw |
 
 Each setting can also be changed on its own:
 
 - **Points to win:** 5 to 30.
-- **Deuce:** off (first to the target wins), on with a cap, or on with no cap.
-- **Time limit per game:** off, or 5 to 30 minutes. The timer starts at the first point. When time runs out the side ahead wins. If the score is level, you choose whether it's a **draw** or the **next point wins**.
+- **Deuce:** off (first to the target wins), on with a max score, or on with no max.
+- **Time limit per game:** off, or 5 to 30 minutes. The timer starts at the first point. When time runs out the side ahead wins. If the score is tied, you choose **Draw** or **Golden point** (the next point wins).
 
 Draws count as half a win in the standings. Changes apply from the game on court, and finished games keep their scores.
 
@@ -87,11 +102,11 @@ The app plans this many games (times the number of rounds) when a session starts
 
 With 6 or 7 players the planner avoids anyone sitting out two games in a row. With 8, half the group sits each game, so a few people sit out twice in a row to fit every partnership in.
 
-## Characters
+## Awards
 
-Each title comes from a rule about the night's results, not from AI, so it works offline. The app gives each player their strongest title, and no two players share one.
+Each award comes from a rule about the night's results, not from AI, so it works offline. The app gives each player their strongest award, and no two players share one.
 
-| Title | Earned by |
+| Award | Earned by |
 |---|---|
 | The Final Boss | Top of the standings |
 | Giant Killer | Beating the night's winner |
@@ -116,7 +131,7 @@ Each title comes from a rule about the night's results, not from AI, so it works
 3. Pick a **Game mode** and check the **Session** planner fits your booking, then tap **Start playing**.
 4. On **Play**, start the session clock, score each game and tap **Finish**.
 5. If the line-up on court is different from the plan, tap **Change line-up** and swap names. The games after it re-plan around the change.
-6. At the end, open **Results** and tap **Copy for group chat**.
+6. At the end, open **Results** and tap **Copy for group chat** to share the standings and awards.
 
 **Reset session** (on Setup) clears the scores but keeps the players and game mode.
 
@@ -147,6 +162,8 @@ Every push to `main` redeploys the site.
 | `manifest.webmanifest` | App name, colours and icons for Add to Home Screen |
 | `icons/` | App icons |
 | `docs/` | Screenshots for this README |
+| `tests/planner-check.mjs` | Checks the planner: run `node tests/planner-check.mjs` |
+| `CLAUDE.md` | Notes for Claude Code: structure, decisions and conventions |
 | `.nojekyll` | Tells GitHub Pages to serve the files as they are |
 
 To change the names a new phone starts with, edit `DEFAULT_NAMES` in the script in `index.html`. After you push a change, phones pick it up the next time they open the site with a signal.
