@@ -1,6 +1,6 @@
 # Badminton Doubles
 
-A badminton doubles scorekeeper for 4 to 8 players sharing one court. It plans who plays with whom so that everyone partners everyone, keeps score from one phone, and turns the night's results into standings, stats and an award for each player.
+A badminton doubles scorekeeper for 4 to 10 players sharing one court. It plans who plays with whom so that everyone partners everyone, keeps score from one phone, and turns the night's results into standings, stats and an award for each player.
 
 It is a single HTML file with no backend, account or install. Open it in a phone browser, or add it to your home screen.
 
@@ -19,7 +19,7 @@ It is a single HTML file with no backend, account or install. Open it in a phone
 |---|---|
 | **Play** | The court, the score, the game timer and who's up next. Nothing else, so you never scroll while scoring. |
 | **Results** | Standings, awards and highlights, with per-player stats, partners and every game folded away underneath. |
-| **Setup** | Players, game mode, the session planner, export and import, and reset. A new session starts here and ends with **Start playing**. |
+| **Setup** | Players, matchups, game mode, the session planner, export and import, and reset. A new session starts here and ends with **Start playing**. |
 | **About** | What the app is, how to use it, and what the numbers and awards mean. |
 
 The top of every tab shows the day and date of the session, taken from when you start playing, and the rules line under the title is a shortcut to Setup.
@@ -28,6 +28,7 @@ The top of every tab shows the day and date of the session, taken from when you 
 
 - **Partner rotation.** Plans the games so every pair partners at least once, games are shared out evenly, and nobody sits out more than they have to.
 - **Levels.** Each player can be set as Beginner, Intermediate, Advanced or Pro. The planner shares out games against the top level evenly, so the weakest player doesn't keep getting the strongest opponents.
+- **Matchups.** Choose what comes first when levels differ: **Mix everyone** (the default) or **Even games**. Each says what it costs before you pick it.
 - **Late arrivals and early leavers.** Mark someone as here or not here and the remaining games are re-planned. The game on court stays as it is unless someone in it leaves.
 - **Scoring from one phone.** Tap a player's name to give their side the point and credit that player, or tap a side's score when nobody in particular earned it. **Undo last point** takes back the last tap. Scores follow the game mode you pick, so a game can't be finished on an impossible score.
 - **Safety nets.** After **Finish**, an **Undo** button appears for a few seconds. **Reset to 0–0** needs two taps. The game mode is locked while a game is in progress.
@@ -51,11 +52,29 @@ Levels never change who partners whom: everyone still partners everyone, game co
 
 - Games against the top level are shared out evenly. With one top-level player among 7, everyone faces them exactly twice.
 - The lowest level never faces the top level more than anyone else.
+- The two sides of each game are matched so they add up to about the same level, so you rarely get Advanced + Intermediate against two Beginners.
 - If everyone is at the same level, the rule switches off and the plan is the same as before.
+
+Because everyone still partners everyone, the two weakest players do partner each other at some point, and whoever they face will be stronger. A few uneven games are the price of the full rotation; the planner keeps them to a minimum.
 
 Change a level at any time and the games after the one on court are re-planned. Before **Start playing**, the first game can change too. Levels are kept when you reset the session and are saved in exported files.
 
-With 8 players, sharing out the top player costs a few extra back-to-back rests, because half the group sits out every game.
+### Matchups: mix everyone, or even games
+
+**Setup → Matchups** decides what the planner puts first when levels differ. It makes no difference if everyone is at the same level.
+
+| | Mix everyone (default) | Even games |
+|---|---|---|
+| Every pair partners at least once | Yes | Usually, but one or two pairs can miss out |
+| Games each | Within 1 of each other | Within 2 |
+| Sides matched by level | Mostly; a few uneven games are left | Every game, from 7 players up |
+| Games against the strongest shared out | Yes | No: the strong players mostly face each other, so a Beginner may not play them at all |
+
+**Mix everyone** is the default because a night where the weakest and the strongest never meet isn't what most social groups turn up for. **Even games** is the right choice for a competitive group that wants every game close and doesn't mind the night splitting into a stronger and a weaker half.
+
+Changing this re-plans the games after the one on court, so you can switch mid-session if the first few games feel wrong.
+
+With 8 players or more, sharing out the top player costs a few extra back-to-back rests, because half the group sits out every game. With 9 or 10 the sharing is close but not exact: one person may face the top level once more than the rest, and the lowest level still faces them least.
 
 ## Game modes
 
@@ -97,10 +116,14 @@ Each game uses two partnerships, so pairing everyone once takes:
 | 6 | 15 | 8 | 5–6 | 2 |
 | 7 | 21 | 11 | 6–7 | 3 |
 | 8 | 28 | 14 | 7 | 4 |
+| 9 | 36 | 18 | 8 | 5 |
+| 10 | 45 | 23 | 9–10 | 6 |
 
 The app plans this many games (times the number of rounds) when a session starts. In a two-hour booking at about 10 minutes a game, 14 games for 8 players is tight, and the session planner will suggest a fix. If you plan fewer games, the Partners grid shows which pairs will miss out.
 
-With 6 or 7 players the planner avoids anyone sitting out two games in a row. With 8, half the group sits each game, so a few people sit out twice in a row to fit every partnership in.
+With 9 or 10 players the full rotation needs more games than most bookings fit — 23 games for 10 people is over four hours at 12 minutes a game. Plan the games that fit instead: the planner gives out new partnerships first, so nobody partners the same person twice until everyone has partnered once, and the Partners grid shows who missed out. Shorter games help: at 11 points you get through noticeably more.
+
+With 6 or 7 players the planner avoids anyone sitting out two games in a row. With 8, half the group sits each game, so a few people sit out twice in a row to fit every partnership in. From 9 players up it is unavoidable: only four of the people sitting can come on next, so with 9 one of them sits again and with 10 two do. The planner keeps that to the minimum, and nobody sits out more than three games in a row.
 
 ## Awards
 
@@ -127,11 +150,12 @@ Each award comes from a rule about the night's results, not from AI, so it works
 ## Using it at the court
 
 1. Open the site on the phone you'll score with. Use **Add to Home Screen** to get an app icon.
-2. On **Setup**, tap **Edit players** to rename people, or add players up to 8. Mark anyone who hasn't arrived as **Not here**.
-3. Pick a **Game mode** and check the **Session** planner fits your booking, then tap **Start playing**.
-4. On **Play**, start the session clock, score each game and tap **Finish**.
-5. If the line-up on court is different from the plan, tap **Change line-up** and swap names. The games after it re-plan around the change.
-6. At the end, open **Results** and tap **Copy for group chat** to share the standings and awards.
+2. On **Setup**, tap **Edit players** to rename people, or add players up to 10. Mark anyone who hasn't arrived as **Not here**.
+3. If the group is mixed, check **Matchups**: mix everyone, or keep every game close.
+4. Pick a **Game mode** and check the **Session** planner fits your booking, then tap **Start playing**.
+5. On **Play**, start the session clock, score each game and tap **Finish**.
+6. If the line-up on court is different from the plan, tap **Change line-up** and swap names. The games after it re-plan around the change.
+7. At the end, open **Results** and tap **Copy for group chat** to share the standings and awards.
 
 **Reset session** (on Setup) clears the scores but keeps the players and game mode.
 

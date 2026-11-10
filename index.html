@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Badminton doubles rotation and scorekeeper for 4–8 players on one court.">
+<meta name="description" content="Badminton doubles rotation and scorekeeper for 4–10 players on one court.">
 <meta name="theme-color" content="#1B7650">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -338,6 +338,10 @@ a.eyebrow:focus-visible{outline:3px solid var(--accent);outline-offset:2px;borde
       <h2 id="h-roster">Players</h2>
       <div id="roster" class="rosterwrap"></div>
     </section>
+    <section aria-labelledby="h-match">
+      <h2 id="h-match">Matchups</h2>
+      <div id="match" class="rosterwrap"></div>
+    </section>
     <section aria-labelledby="h-mode">
       <h2 id="h-mode">Game mode</h2>
       <div id="mode" class="rosterwrap"></div>
@@ -382,30 +386,53 @@ function buildStats(players,games){
 }
 function combos4(n){const r=[];for(let a=0;a<n;a++)for(let b=a+1;b<n;b++)for(let c=b+1;c<n;c++)for(let d=c+1;d<n;d++)r.push([a,b,c,d]);return r;}
 function planGames(players,history,count,opts={}){
-  let restarts=opts.restarts||300;const rng=mulberry32(opts.seed||7);
+  const rng=mulberry32(opts.seed||7);
   const active=players.filter(p=>p.here).map(p=>p.id);
   if(active.length<4||count<=0) return [];
-  // With 8 players half the group sits each game; a softer sit-out penalty lets everyone partner everyone
+  // From 8 players up, half or more of the group sits each game; a softer sit-out penalty lets everyone partner everyone
   const sitW=active.length>=8?8:25,sitF=active.length>=8?10:40;
   const off={};players.forEach(p=>off[p.id]=p.offset||0);
   // Levels: share out games against the top level evenly, and the lowest level faces them least.
   const lvl={};players.forEach(p=>lvl[p.id]=p.level||2);
   const lv=active.map(id=>lvl[id]),topL=Math.max(...lv),lowL=Math.min(...lv),rule=topL>lowL;
-  // With levels, the first half of the restarts are the normal planner (so every other rule holds),
-  // the second half lean towards sharing out the top level; the best plan overall wins.
-  const plain=restarts;if(rule)restarts*=2;
   const isTop=id=>rule&&lvl[id]===topL,isLow=id=>rule&&lvl[id]===lowL;
+  // Even sides: the two pairs in a game should add up to about the same level, so nobody gets
+  // Advanced+Intermediate against two Beginners. How hard the planner tries depends on the
+  // pairing mode the group picked in Setup > Matchups:
+  //
+  //   'mix' (the default) scores the sides in polish() only. Swapping opponents there cannot
+  //   change a partnership or a game count, so evening out the sides costs nothing. A few uneven
+  //   games are left over, because rule 1 makes the two weakest players partner sooner or later.
+  //
+  //   'even' softens rule 1 to 200 and scores the sides all the way through the build, so every
+  //   game comes out close. The price is real and measured (see CLAUDE.md): 1-2 partnerships a
+  //   night never happen, game counts drift up to 2 apart, and the group stratifies - the
+  //   strongest players mostly face each other, so the Beginners may never play them.
+  //
+  // With one level present there is nothing to even out and both modes plan the same games.
+  const even=rule&&!!opts.even;
+  const UNC=even?200:1000;
+  const balW=rule?(even?8:4):0;
+  const gap2=g=>(lvl[g.a[0]]+lvl[g.a[1]]-lvl[g.b[0]]-lvl[g.b[1]])**2;
   const F0={};active.forEach(id=>F0[id]=0);
   const faceTop=(g,F)=>{for(const [s,o] of [[g.a,g.b],[g.b,g.a]]){const t=s.filter(isTop).length;if(t)for(const x of o)if(!isTop(x)&&x in F)F[x]+=t;}};
   if(rule)history.forEach(g=>faceTop(g,F0));
   const base=buildStats(players,history);
   const last=history[history.length-1];
   const C=combos4(active.length);
+  // Each restart costs count x C.length pairings, so above 8 players we trade restarts for speed:
+  // a re-plan has to stay well under a second on a phone. 4-8 players keep the full 300, so their plans don't change.
+  let restarts=opts.restarts||(active.length<=8?300:Math.min(300,Math.max(60,Math.round(294000/(count*C.length)))));
+  // With levels, the first part of the restarts are the normal planner (so every other rule holds),
+  // the rest lean towards sharing out the top level; the best plan overall wins. Above 8 players the
+  // budget is tighter, so more of it goes to the level-aware part, where the spreading is decided.
+  const plain=rule&&active.length>8?Math.max(20,Math.round(restarts*0.4)):restarts;
+  if(rule)restarts*=2;
   let best=null,bestScore=Infinity;
   for(let r=0;r<restarts;r++){
     const gp={...base.gp},P={...base.P},O={...base.O},F={...F0},nudge=r>=plain;
     let lastIn=last?new Set([...last.a,...last.b]):null;
-    const plan=[];let sitTwice=0;
+    const plan=[];let sitTwice=0,balSum=0;
     for(let k=0;k<count;k++){
       const eff=active.map(id=>(gp[id]||0)+off[id]);
       const sorted=[...eff].sort((x,y)=>x-y);
@@ -423,7 +450,8 @@ function planGames(players,history,count,opts={}){
           let opp=0;for(const u of a)for(const v of b)opp+=(O[pk(u,v)]||0);
           let top=0;
           if(nudge)for(const [s,o] of [[a,b],[b,a]]){const t=s.filter(isTop).length;if(t)for(const x of o)if(!isTop(x))top+=((F[x]+t)**2-F[x]**2)*(isLow(x)?4:2);}
-          const cost=fair+sit+part+opp*0.6+top+rng()*(nudge?3+(r%4)*10:3);
+          const bal=even?(lvl[a[0]]+lvl[a[1]]-lvl[b[0]]-lvl[b[1]])**2*balW:0;
+          const cost=fair+sit+part+opp*0.6+top+bal+rng()*(nudge?3+(r%4)*10:3);
           if(cost<optC){optC=cost;opt={a,b};}
         }
       }
@@ -434,6 +462,7 @@ function planGames(players,history,count,opts={}){
       P[pk(opt.b[0],opt.b[1])]=(P[pk(opt.b[0],opt.b[1])]||0)+1;
       for(const u of opt.a)for(const v of opt.b)O[pk(u,v)]=(O[pk(u,v)]||0)+1;
       if(rule)faceTop(opt,F);
+      if(even)balSum+=gap2(opt);
       plan.push(opt);lastIn=new Set(ids);
     }
     let unc=0,rep=0,opp2=0;
@@ -447,7 +476,7 @@ function planGames(players,history,count,opts={}){
       const nt=active.filter(id=>!isTop(id)),m=nt.reduce((s,id)=>s+F[id],0)/nt.length;
       topScore=nt.reduce((s,id)=>s+(F[id]-m)**2,0)/nt.length*20+nt.filter(isLow).reduce((s,id)=>s+Math.max(0,F[id]-m)**2,0)*20;
     }
-    const score=unc*1000+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3+topScore;
+    const score=unc*UNC+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3+topScore+balSum*balW;
     if(score<bestScore){bestScore=score;best=plan;}
   }
   if(rule&&best)best=polish(best);
@@ -456,14 +485,14 @@ function planGames(players,history,count,opts={}){
   // Score a whole plan the same way as above (used by the polishing step).
   function scorePlan(plan){
     const gp={...base.gp},P={...base.P},O={...base.O},F={...F0};
-    let lastIn=last?new Set([...last.a,...last.b]):null,sitTwice=0;
+    let lastIn=last?new Set([...last.a,...last.b]):null,sitTwice=0,balSum=0;
     for(const g of plan){
       const ids=[...g.a,...g.b];
       if(lastIn){for(const id of active)if(!ids.includes(id)&&!lastIn.has(id))sitTwice++;}
       for(const id of ids)gp[id]=(gp[id]||0)+1;
       P[pk(g.a[0],g.a[1])]=(P[pk(g.a[0],g.a[1])]||0)+1;P[pk(g.b[0],g.b[1])]=(P[pk(g.b[0],g.b[1])]||0)+1;
       for(const u of g.a)for(const v of g.b)O[pk(u,v)]=(O[pk(u,v)]||0)+1;
-      faceTop(g,F);lastIn=new Set(ids);
+      faceTop(g,F);balSum+=gap2(g);lastIn=new Set(ids);
     }
     let unc=0,rep=0,opp2=0;
     for(let i=0;i<active.length;i++)for(let j=i+1;j<active.length;j++){
@@ -472,7 +501,7 @@ function planGames(players,history,count,opts={}){
     const effs=active.map(id=>(gp[id]||0)+off[id]),imb=Math.max(...effs)-Math.min(...effs);
     const nt=active.filter(id=>!isTop(id)),m=nt.reduce((s,id)=>s+F[id],0)/nt.length;
     const topScore=nt.reduce((s,id)=>s+(F[id]-m)**2,0)/nt.length*20+nt.filter(isLow).reduce((s,id)=>s+Math.max(0,F[id]-m)**2,0)*20;
-    return unc*1000+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3+topScore;
+    return unc*UNC+sitTwice*sitF+imb*imb*15+rep*2+opp2*0.3+topScore+balSum*balW;
   }
   // Swap opponents between two games (every partnership and game count stays the same,
   // only who faces whom changes), or swap the order of two games. Keep any change that scores better.
@@ -501,7 +530,7 @@ function planGames(players,history,count,opts={}){
 // ---------- state ----------
 const KEY='thursday-doubles-v2';
 const DEFAULT_NAMES=['Fat','Mire','Git','Ses','Don','Mand','Audi'];
-const MAX_PLAYERS=8,MIN_PLAYERS=4;
+const MAX_PLAYERS=10,MIN_PLAYERS=4;
 const NAME_RE=/^[\p{L}\p{N}][\p{L}\p{N} .'\-]{0,11}$/u;
 let state,sel=null,swapMode=false,editing=false,editDraft=null,editErr='';
 // games needed for every pair to partner once: n players → n(n−1)/2 pairs, 2 pairs a game
@@ -510,7 +539,8 @@ const gamesToPairAll=n=>Math.ceil(n*(n-1)/4);
 // ---------- game mode ----------
 // deuce: 'none' = first to target; 'cap' = from target−1 all win by 2, up to cap; 'nocap' = win by 2, no limit
 // limit: minutes per game (0 = off); timeUp: what a level score means when time runs out ('golden' = next point wins, 'draw')
-const DEFAULT_RULES={target:15,deuce:'cap',cap:20,limit:0,timeUp:'golden',sessionMin:120,warmup:0,rounds:1};
+// pairing: what the planner puts first when levels differ - 'mix' = everyone partners everyone, 'even' = matched sides
+const DEFAULT_RULES={target:15,deuce:'cap',cap:20,limit:0,timeUp:'golden',sessionMin:120,warmup:0,rounds:1,pairing:'mix'};
 const PRESETS=[
   {id:'club15',label:'Club 15',r:{target:15,deuce:'cap',cap:20,limit:0}},
   {id:'quick11',label:'Quick 11',r:{target:11,deuce:'cap',cap:15,limit:0}},
@@ -529,9 +559,12 @@ function sanitizeRules(x){
   if(int(o.sessionMin,30,480))r.sessionMin=o.sessionMin;
   if(int(o.warmup,0,120))r.warmup=o.warmup;
   if(int(o.rounds,1,4))r.rounds=o.rounds;
+  if(['mix','even'].includes(o.pairing))r.pairing=o.pairing;
   return r;
 }
 function R(){if(!state.rules)state.rules=sanitizeRules(null);return state.rules;}
+// what planGames needs from the rules: the pairing mode picked in Setup > Matchups
+function planOpts(r){return {even:(r||R()).pairing==='even'};}
 const maxPts=(r=R())=>r.deuce==='none'?r.target:r.deuce==='cap'?r.cap:99;
 // a finished score under the points rules alone
 function regularWin(a,b,r=R()){
@@ -569,7 +602,7 @@ function newSession(names,rules){
   const players=names.map(n=>typeof n==='string'?{id:n,here:true,offset:0,level:2}:{id:n.id,here:true,offset:0,level:n.level||2});
   const r=sanitizeRules(rules);
   const target=r.rounds*gamesToPairAll(players.length);
-  return {players,history:[],plan:planGames(players,[],target),cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:r};
+  return {players,history:[],plan:planGames(players,[],target,planOpts(r)),cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:r};
 }
 function initial(){return newSession(DEFAULT_NAMES);}
 // point log for the game on court: one entry per point, with who won it when someone was credited
@@ -640,9 +673,9 @@ function replan(msg){
   const here=hereIds();
   // before Start playing nothing is on court yet, so the first game can change too
   if(cur&&left>0&&(state.started||state.history.length)&&[...cur.a,...cur.b].every(id=>here.has(id))){
-    state.plan=[cur,...planGames(state.players,[...state.history,cur],left-1)];
+    state.plan=[cur,...planGames(state.players,[...state.history,cur],left-1,planOpts())];
   }else{
-    state.plan=planGames(state.players,state.history,left);
+    state.plan=planGames(state.players,state.history,left,planOpts());
     state.cur={sa:0,sb:0,log:[]};
   }
   save();render();if(msg)toast(msg);
@@ -666,7 +699,15 @@ function showTab(t){
   TABS.forEach(x=>{const pnl=$('#panel-'+x),a=$('#tab-'+x);pnl.hidden=x!==tab;if(a&&a.setAttribute){if(x===tab)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');}});
 }
 function route(){showTab(typeof location!=='undefined'?location.hash.slice(1):'');try{window.scrollTo(0,0);}catch(e){}}
-function goTab(t){if(typeof location!=='undefined'&&location.hash!=='#'+t)location.hash='#'+t;else route();}
+// Switch tabs directly. Hash navigation is ignored in some embedded viewers (the Claude viewer,
+// data: URLs), so the hash is only kept in step for deep links and the back button.
+function goTab(t){
+  showTab(t);
+  try{window.scrollTo(0,0);}catch(e){}
+  // pushState updates the address without navigating, so the back button still steps through
+  // tabs and sandboxed viewers refuse it quietly instead of logging a navigation error.
+  try{if(location.hash!=='#'+t)history.pushState(null,'','#'+t);}catch(e){}
+}
 const modeLocked=()=>!!state.plan[0]&&(state.cur.sa+state.cur.sb)>0;
 
 // ---------- render ----------
@@ -675,7 +716,7 @@ function render(){
   $('#meta').textContent=state.plan.length?`Game ${played+1} of ${total}`:`${played} games played`;
   $('#dateline').textContent=dayLabel();
   const r=R();$('#ruleline').textContent=`1 court · first to ${r.target}${r.deuce==='cap'?` · deuce to ${r.cap}`:r.deuce==='nocap'?' · deuce, no cap':''}${r.limit?` · ${r.limit} min`:''}`;
-  renderMode();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();renderBackup();renderAbout();renderShare();
+  renderMode();renderMatch();renderClock();renderArrivals();renderCourt();renderNext();renderStandings();renderChars();renderStats();renderPairs();renderRoster();renderResults();renderSession();renderBackup();renderAbout();renderShare();
 }
 function renderClock(){
   const el=$('#clock');
@@ -1028,7 +1069,7 @@ function renderResults(){
 }
 const clamp=(v,lo,hi)=>Math.min(hi,Math.max(lo,v));
 const stepHTML=(k,val,decDis,incDis,lab)=>`<div class="stepper"><button class="step" id="${k}-dec" data-act="rule" data-k="${k}" data-d="-1" aria-label="Lower ${lab}" ${decDis?'disabled':''}>−</button><output class="num">${val}</output><button class="step" id="${k}-inc" data-act="rule" data-k="${k}" data-d="1" aria-label="Raise ${lab}" ${incDis?'disabled':''}>+</button></div>`;
-const segHTML=(k,opts,cur,lab,dis)=>`<div class="seg" role="group" aria-label="${lab}">${opts.map(([v,t])=>`<button id="${k}-${v}" data-act="ruleset" data-k="${k}" data-v="${v}" aria-pressed="${cur===v}" ${dis?'disabled':''}>${t}</button>`).join('')}</div>`;
+const segHTML=(k,opts,cur,lab,dis,act='ruleset')=>`<div class="seg" role="group" aria-label="${lab}">${opts.map(([v,t])=>`<button id="${k}-${v}" data-act="${act}" data-k="${k}" data-v="${v}" aria-pressed="${cur===v}" ${dis?'disabled':''}>${t}</button>`).join('')}</div>`;
 function renderMode(){
   const r=R(),pre=PRESETS.find(p=>Object.entries(p.r).every(([k,v])=>r[k]===v)),lk=modeLocked();
   $('#mode').innerHTML=`
@@ -1042,13 +1083,24 @@ function renderMode(){
   ${r.limit?`<div class="setcol"><div><b>Tied when time runs out</b><p class="muted">Golden point: the next point wins.</p></div>${segHTML('timeUp',[['golden','Golden point'],['draw','Draw']],r.timeUp,'Tied when time runs out',lk)}</div>`:''}
   <p class="note">Changes apply from the next game. Finished games keep their scores.</p>`;
 }
+// ---------- matchups ----------
+// Two honest options, not a good one and a bad one. Say what each costs, because the cost
+// is what the group is choosing between. With one level present neither does anything.
+function renderMatch(){
+  const r=R(),here=state.players.filter(p=>p.here),lv=here.map(p=>p.level||2);
+  const mixed=here.length>0&&Math.max(...lv)>Math.min(...lv),even=r.pairing==='even';
+  $('#match').innerHTML=`
+  <div class="setcol"><div><b>What comes first</b><p class="muted">${even?'Even games: the two sides of each game add up to about the same level.':'Mix everyone: every pair partners at least once, and everyone plays the same number of games.'}</p></div>${segHTML('pairing',[['mix','Mix everyone'],['even','Even games']],r.pairing,'What comes first',false,'pairing')}</div>
+  <p class="note">${!mixed?'Everyone here is at the same level, so this makes no difference tonight.':even?'Every game should be close. The price: one or two partnerships may never happen, game counts can end up 2 apart, and the strongest players mostly face each other, so the Beginners may not play them at all.':'A few games will be uneven: once the two weakest players partner, whoever they face is stronger. The planner keeps those to a minimum.'}</p>
+  <p class="note">Changing this re-plans the games after the one on court.</p>`;
+}
 // ---------- about ----------
 const CHAR_INFO=[['The Final Boss','Top of the standings'],['Giant Killer',"Beat the night's winner"],['Robbed by the Scoreboard','Won far more points than games'],['Ice in the Veins','Won games that went to deuce'],['On Fire','The longest winning streak, 3 or more'],['The Finisher',"Won the biggest share of their side's points personally"],['Points Machine','Scored the most points'],['The Wall','Conceded the fewest points a game'],['The Pendulum','Alternated wins and losses all night'],['Strong Finisher','A much better second half of the night'],['Out of the Blocks','A much better first half of the night'],['The Metronome','The steadiest margins'],['The Rollercoaster','The wildest swings between big wins and big losses'],['Iron Lungs','Played the most points'],['The Social Butterfly, The Grafter, The Regular','When nothing else fits']];
 function renderAbout(){
   const n=state.players.filter(p=>p.here).length,G=gamesToPairAll(n);
   $('#aboutbody').innerHTML=`
   <section><h2>What this is</h2>
-    <p class="lead-in">Badminton Doubles plans and scores a night of badminton doubles for 4 to 8 people sharing one court.</p>
+    <p class="lead-in">Badminton Doubles plans and scores a night of badminton doubles for 4 to 10 people sharing one court.</p>
     <p>It picks the pairs so everyone partners everyone, keeps score on one phone, and sums up the night with standings, stats and a title for each player.</p></section>
   <section><h2>How to use it</h2>
     <ol>
@@ -1061,7 +1113,11 @@ function renderAbout(){
     <p>If someone arrives late or leaves early, mark them in Setup. The games after the one on court are re-planned.</p></section>
   <section><h2>Levels</h2>
     <p>Each player picks a level in Setup: Beginner, Intermediate, Advanced or Pro. It can be their own view or the group's, and it only needs to be right relative to whoever is playing that night.</p>
-    <p>Levels never change who partners whom: everyone still partners everyone. They only decide who plays against the strongest players. Games against the top level are shared out evenly, so the weakest player doesn't keep getting the strongest opponents. If everyone is at the same level, this switches off. You can change a level at any time and the games after the one on court are re-planned.</p></section>
+    <p>Levels only decide who you play against. Games against the top level are shared out evenly, so the weakest player doesn't keep getting the strongest opponents, and the two sides of a game are matched so they add up to about the same level. If everyone is at the same level, this switches off. You can change a level at any time and the games after the one on court are re-planned.</p></section>
+  <section><h2>Matchups</h2>
+    <p><b>Mix everyone</b>, the default, keeps the full rotation: every pair partners at least once and everyone plays the same number of games. A few games end up uneven, because once the two weakest players partner, whoever they face is stronger. That one is unavoidable.</p>
+    <p><b>Even games</b> matches the two sides of every game instead. Games stay close, but one or two partnerships may never happen, game counts can end up 2 apart, and the strongest players mostly face each other — so the Beginners may not play them at all. Pick it if close games matter more to your group than everyone mixing.</p>
+    <p>Both are in <a href="#setup">Setup</a>, and neither makes any difference if everyone is at the same level. Switching re-plans the games after the one on court, so you can change your mind a few games in.</p></section>
   <section><h2>Tonight's rules</h2><p>${rulesSentence()}</p></section>
   <section><h2>Reading the numbers</h2>
     <dl>
@@ -1134,7 +1190,7 @@ function renderSession(){
     <div class="setrow"><p class="muted">Clear all scores and start a new session. Players and game mode are kept.</p><button class="btn danger" id="reset" data-act="reset">${resetArmed?'Tap again to clear':'Reset session'}</button></div>`;
 }
 let importing=false,importErr='',exportText='',exportNote='',pendingImport=null;
-function sessionData(){return {app:'thursday-doubles',v:4,date:state.date||ymd(sessionDay()),players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0,level:p.level||2})),history:state.history,target:state.target,rules:R()};}
+function sessionData(){return {app:'thursday-doubles',v:5,date:state.date||ymd(sessionDay()),players:state.players.map(p=>({id:p.id,here:p.here,offset:p.offset||0,level:p.level||2})),history:state.history,target:state.target,rules:R()};}
 function sessionText(){return JSON.stringify(sessionData());}
 // check a saved session; returns {err} or {d} without touching the current one
 function parseSession(txt){
@@ -1161,7 +1217,7 @@ function applySession(d){
   const firstT=history.find(g=>g.t>0);
   const date=typeof d.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(d.date)?d.date:firstT?ymd(new Date(firstT.t)):undefined;
   state={players,history,plan:[],cur:{sa:0,sb:0,log:[]},target,clockStart:null,rules:sanitizeRules(d.rules||(state&&state.rules)),date,started:history.length>0};
-  state.plan=planGames(players,history,target-history.length);
+  state.plan=planGames(players,history,target-history.length,planOpts());
   sel=null;swapMode=false;statPlayer=null;editing=false;
 }
 // ---------- export and import ----------
@@ -1328,6 +1384,13 @@ document.addEventListener('click',e=>{
     save();render();return;
   }
   if(act==='ruleset'){if(modeLocked()){toast('Finish the game on court before changing the game mode.');return;}const r=R();r[b.dataset.k]=b.dataset.v;save();render();return;}
+  if(act==='pairing'){
+    const v=b.dataset.v;if(!['mix','even'].includes(v))return;
+    const r=R();if(r.pairing===v)return;
+    r.pairing=v;
+    replan(v==='even'?'Even games first. Games after this one are re-planned.':'Mix everyone first. Games after this one are re-planned.');
+    return;
+  }
   if(act==='preset'){
     const p=PRESETS.find(x=>x.id===b.dataset.id);if(!p)return;
     if(modeLocked()){toast('Finish the game on court before changing the game mode.');return;}
@@ -1345,7 +1408,15 @@ document.addEventListener('click',e=>{
     resetArmed=false;clearTimeout(resetT);sel=null;swapMode=false;state=newSession(state.players.map(p=>({id:p.id,level:p.level})),state.rules);save();render();goTab('setup');toast('New session ready. Players and game mode are kept.');return;
   }
 });
-document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('.tabbar a');if(a&&a.getAttribute&&typeof location!=='undefined'&&a.getAttribute('href')===location.hash){e.preventDefault();window.scrollTo({top:0,behavior:'smooth'});}});
+// Every in-page link to a tab is handled here, for the same reason: a bare href="#play" does
+// nothing in the viewer. Tapping the tab you are already on scrolls back to the top.
+document.addEventListener('click',e=>{
+  const a=e.target.closest&&e.target.closest('a[href^="#"]');if(!a||!a.getAttribute)return;
+  const t=(a.getAttribute('href')||'').slice(1);if(!TABS.includes(t))return;
+  e.preventDefault();
+  if(t===tab){try{window.scrollTo({top:0,behavior:'smooth'});}catch(e2){}return;}
+  goTab(t);
+});
 document.addEventListener('change',e=>{
   const t=e.target;if(!t||!t.dataset||t.dataset.lvl===undefined)return;
   const p=state.players[+t.dataset.lvl],v=+t.value;if(!p||![1,2,3,4].includes(v))return;
@@ -1394,7 +1465,7 @@ function start(data){
   state=(data&&data.key===KEY&&data.state)||load()||initial();
   render();route();
 }
-if(typeof window!=='undefined'&&window.addEventListener)window.addEventListener('hashchange',route);
+if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('hashchange',route);window.addEventListener('popstate',route);}
 window.claude?.hot?.snapshot?.(()=>({state,key:KEY}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 </script>
