@@ -127,7 +127,7 @@ With 6 or 7 players the planner avoids anyone sitting out two games in a row. Wi
 
 ## Awards
 
-Each award comes from a rule about the night's results, not from AI, so it works offline. The app gives each player their strongest award, and no two players share one.
+Each award comes from a rule about the night's results, not from AI, so it works offline. The app gives each player their strongest award, and no two players share one. On a quiet night the fallbacks at the bottom of the table fill the gaps, so everyone still ends up with a title of their own.
 
 | Award | Earned by |
 |---|---|
@@ -145,7 +145,8 @@ Each award comes from a rule about the night's results, not from AI, so it works
 | The Metronome | The steadiest margins |
 | The Rollercoaster | The wildest swings between big wins and big losses |
 | Iron Lungs | The most total points played |
-| The Social Butterfly / The Grafter / The Regular | Fallbacks when nothing else fits |
+| The First One On / The Last One Off | Opening or closing the night on court |
+| The Social Butterfly / The Utility Player / The Workhorse / The Grafter | Fallbacks when nothing else fits |
 
 ## Using it at the court
 

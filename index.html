@@ -887,7 +887,14 @@ function archetypes(){
       if(wb>=2&&wb-wa>=swing)add(r.id,'finish','Strong Finisher',60+(wb-wa)/h*20,`Won ${wb} of their last ${h} games after ${wa} of their first ${h}.`);
       if(wa>=2&&wa-wb>=swing)add(r.id,'blocks','Out of the Blocks',48+(wa-wb)/h*10,`Won ${wa} of their first ${h} games.`);
     }
+    // Fallbacks. Scored below every real award, so they never displace one, but keyed like any
+    // other award, so the loop below hands each to a different player. Without enough of these a
+    // quiet night ends with two or three people holding the same leftover title.
     add(r.id,'social','The Social Butterfly',10,`Partnered ${new Set(G.map(x=>x.mate)).size} different people tonight.`);
+    if(G[0].i===0)add(r.id,'opener','The First One On',9,`First on court tonight, straight into game 1.`);
+    if(G[G.length-1].i===H.length-1)add(r.id,'closer','The Last One Off',8,`Still out there for the last game of the night.`);
+    add(r.id,'utility','The Utility Player',7,`Lined up against ${new Set(G.flatMap(x=>x.opp)).size} different opponents tonight.`);
+    add(r.id,'workhorse','The Workhorse',6,`${r.pf+r.pa} points played across ${r.P} games.`);
     add(r.id,'grafter','The Grafter',5,`${r.P} games and ${r.pf} points, no complaints.`);
   }
   C.sort((x,y)=>y.score-x.score);
@@ -1095,7 +1102,7 @@ function renderMatch(){
   <p class="note">Changing this re-plans the games after the one on court.</p>`;
 }
 // ---------- about ----------
-const CHAR_INFO=[['The Final Boss','Top of the standings'],['Giant Killer',"Beat the night's winner"],['Robbed by the Scoreboard','Won far more points than games'],['Ice in the Veins','Won games that went to deuce'],['On Fire','The longest winning streak, 3 or more'],['The Finisher',"Won the biggest share of their side's points personally"],['Points Machine','Scored the most points'],['The Wall','Conceded the fewest points a game'],['The Pendulum','Alternated wins and losses all night'],['Strong Finisher','A much better second half of the night'],['Out of the Blocks','A much better first half of the night'],['The Metronome','The steadiest margins'],['The Rollercoaster','The wildest swings between big wins and big losses'],['Iron Lungs','Played the most points'],['The Social Butterfly, The Grafter, The Regular','When nothing else fits']];
+const CHAR_INFO=[['The Final Boss','Top of the standings'],['Giant Killer',"Beat the night's winner"],['Robbed by the Scoreboard','Won far more points than games'],['Ice in the Veins','Won games that went to deuce'],['On Fire','The longest winning streak, 3 or more'],['The Finisher',"Won the biggest share of their side's points personally"],['Points Machine','Scored the most points'],['The Wall','Conceded the fewest points a game'],['The Pendulum','Alternated wins and losses all night'],['Strong Finisher','A much better second half of the night'],['Out of the Blocks','A much better first half of the night'],['The Metronome','The steadiest margins'],['The Rollercoaster','The wildest swings between big wins and big losses'],['Iron Lungs','Played the most points'],['The First One On, The Last One Off','First or last on court tonight'],['The Social Butterfly, The Utility Player, The Workhorse, The Grafter, The Regular','When nothing else fits']];
 function renderAbout(){
   const n=state.players.filter(p=>p.here).length,G=gamesToPairAll(n);
   $('#aboutbody').innerHTML=`

@@ -66,7 +66,7 @@ When levels or attendance change, `replan()` keeps the game on court (once play 
 - **No Elo, no head start, no in-night learning of ratings.** All were explored in simulation and judged over-engineered for this group.
 - **Standings** rank by win % (a draw counts as half), then points won %, then point difference per game.
 - **Terms:** P, W, D, L, PF, PA, PD, Win %, Pts won %, Own pts, Own share, Deuce W–L, Max score, Golden point, Total games, Awards. Use these words in UI copy.
-- **Awards** are rule-based (no AI). One award per player, no award given twice.
+- **Awards** are rule-based (no AI). One award per player, no award given twice. Every candidate carries a `key`, and the greedy pass in `archetypes()` skips a candidate whose player or whose key is already taken, so the keys are what keep titles unique. Six low-scoring fallbacks (`social`, `opener`, `closer`, `utility`, `workhorse`, `grafter`, scored 10 down to 5, far below the ~47 floor of a real award) are keyed the same way, so a quiet night hands out six distinct leftovers rather than one repeated. `'The Regular'` is the last resort after those and is the one title with no key: with 10 players it can still be reached, but at most by one player, because three real keys (`pts`, `lungs`, `wall`) always have candidates. Checked over 6,600 simulated nights at 8-10 players: no repeated title, never more than one `The Regular`.
 
 ## Conventions
 
