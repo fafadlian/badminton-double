@@ -529,7 +529,10 @@ function planGames(players,history,count,opts={}){
 
 // ---------- state ----------
 const KEY='thursday-doubles-v2';
-const DEFAULT_NAMES=['Fat','Mire','Git','Ses','Don','Mand','Audi'];
+// Placeholder roster for a first open, so a new phone never shows anyone's real group. Six is
+// a valid starting size (MIN_PLAYERS is 4) and needs 8 games for everyone to partner everyone.
+// A returning phone has its own roster in localStorage and never sees these again.
+const DEFAULT_NAMES=['Gibr','Prabs','Ans','Gnjr','Mega','Bahll'];
 const MAX_PLAYERS=10,MIN_PLAYERS=4;
 const NAME_RE=/^[\p{L}\p{N}][\p{L}\p{N} .'\-]{0,11}$/u;
 let state,sel=null,swapMode=false,editing=false,editDraft=null,editErr='';
